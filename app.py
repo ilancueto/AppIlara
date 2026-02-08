@@ -35,13 +35,11 @@ def limpiar_cache():
     st.cache_data.clear()
 
 def now_ar_str():
+    # Fecha “linda” AR (para guardar en finanzas si querés leerlo fácil)
     return datetime.now(TZ_AR).strftime("%d/%m/%Y %H:%M")
 
 def formatear_monto_ars(x):
     try:
-        # Si querés 0 decimales:
-        # return f"${float(x):,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        # Con 2 decimales:
         return f"${float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except:
         return str(x)
@@ -50,6 +48,7 @@ def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
     """
     Convierte timestamps (UTC o ISO) a hora Argentina y formatea.
     Si ya viniera como string, intenta parsear.
+    Devuelve columnas: fecha_dt y fecha_fmt.
     """
     if df.empty or "fecha" not in df.columns:
         return df
@@ -68,7 +67,6 @@ def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
     try:
         out["fecha_dt"] = out["fecha_dt"].dt.tz_convert(TZ_AR)
     except Exception:
-        # si no tiene tz, la dejamos y formateamos igual
         pass
 
     out["fecha_fmt"] = out["fecha_dt"].dt.strftime("%d/%m/%Y %H:%M")
@@ -117,7 +115,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by ChadGpt e Ilan con amor · v3</div>
+    <div class="footer-fixed">by Ilan con amor · v3.0.1</div>
     """,
     unsafe_allow_html=True
 )
@@ -225,7 +223,7 @@ with tab1:
             marca_final = marca if marca else "Genérico"
 
             cat = a.selectbox("Categoría", ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"])
-            cant = b.number_input("Cantidad", min_value=1, value=1)
+            cant = b.number_input("Cantidad", min_value=1, value=1, step=1)
 
             costo = a.number_input("Costo ($)", min_value=0.0, value=None, placeholder="0,00")
             venta = b.number_input("Venta ($)", min_value=0.0, value=None, placeholder="0,00")
@@ -314,7 +312,7 @@ with tab1:
             with st.form("form_adj"):
                 prod = st.selectbox("Producto", df_inv["display"].unique())
                 tipo = st.radio("Tipo", ["Resta (Pérdida/Regalo)", "Suma (Encontré stock)"])
-                cant = st.number_input("Cantidad", min_value=1, value=1)
+                cant = st.number_input("Cantidad", min_value=1, value=1, step=1)
                 motivo = st.text_input("Motivo (obligatorio)", placeholder="Ej: roto / regalo").strip()
 
                 if st.form_submit_button("Aplicar ajuste"):
@@ -334,7 +332,7 @@ with tab1:
 
                                 signo = "-" if "Resta" in tipo else "+"
                                 supabase.table("finanzas").insert({
-                                    "fecha": datetime.utcnow().isoformat(),
+                                    "fecha": now_ar_str(),
                                     "tipo": "Ajuste",
                                     "descripcion": f"Ajuste: {signo}{cant}x {row['producto']} ({row['marca']}) | Motivo: {motivo}",
                                     "monto": 0.0
@@ -368,9 +366,6 @@ with tab1:
 # =========================================================
 # TAB 2: VENTA (RPC primero)
 # =========================================================
-# =========================================================
-# TAB 2: VENTA (RPC primero)
-# =========================================================
 with tab2:
     st.header("💰 Registrar Venta")
 
@@ -395,10 +390,54 @@ with tab2:
             else:
                 a, b = st.columns(2)
 
-                # No te capamos por stock estimado, porque el REAL lo valida el RPC
-                cantidad = a.number_input("Cantidad", min_value=1, max_value=999, value=1, key=f"cant_{id_prod}")
+                # ✅ FIX: capamos por stock estimado (UX). RPC igual valida stock real.
+                cantidad = a.number_input(
+                    "Cantidad",
+                    min_value=1,
+                    max_value=max(1, stock_est),
+                    value=1,
+                    step=1,
+                    key=f"cant_{id_prod}"
+                )
+
                 total_calc = precio_unit * int(cantidad)
-                total_cobrado = b.number_input("Total a cobrar ($)", min_value=0.0, value=float(total_calc), key=f"total_{id_prod}")
+
+                # ✅ FIX: total sugerido siempre visible y actualizado
+                b.metric("Total sugerido", formatear_monto_ars(total_calc))
+
+                # total editable sin que se “clave”
+                state_key = f"total_final_{id_prod}"
+                if state_key not in st.session_state:
+                    st.session_state[state_key] = float(total_calc)
+
+                total_cobrado = st.number_input(
+                    "Total a cobrar ($)",
+                    min_value=0.0,
+                    value=float(st.session_state[state_key]),
+                    step=100.0,
+                    key=f"total_input_{id_prod}"
+                )
+
+                # Si cambia cantidad, actualizamos el sugerido SOLO si el usuario no tocó el total final manualmente
+                # Detectamos “manual” comparando con el sugerido anterior
+                prev_sug_key = f"prev_sug_{id_prod}"
+                if prev_sug_key not in st.session_state:
+                    st.session_state[prev_sug_key] = float(total_calc)
+
+                if float(st.session_state[prev_sug_key]) != float(total_calc):
+                    # cambió el sugerido (porque cambió cantidad)
+                    # si el total final era igual al sugerido anterior, lo actualizamos automáticamente
+                    if float(st.session_state[state_key]) == float(st.session_state[prev_sug_key]):
+                        st.session_state[state_key] = float(total_calc)
+                        st.session_state[prev_sug_key] = float(total_calc)
+                        st.rerun()
+                    else:
+                        st.session_state[prev_sug_key] = float(total_calc)
+
+                if st.button("Usar total sugerido", key=f"use_sug_{id_prod}"):
+                    st.session_state[state_key] = float(total_calc)
+                    st.session_state[prev_sug_key] = float(total_calc)
+                    st.rerun()
 
                 p1, p2 = st.columns(2)
                 metodo = p1.selectbox("Método de pago", ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"])
@@ -425,7 +464,7 @@ with tab2:
                         limpiar_cache()
                         st.rerun()
 
-                    except Exception as e_rpc:
+                    except Exception:
                         # 2) fallback (sin RPC)
                         try:
                             check = supabase.table("inventario").select("stock").eq("id", id_prod).single().execute()
@@ -434,12 +473,10 @@ with tab2:
                             if stock_real < int(cantidad):
                                 st.error(f"❌ No se pudo registrar la venta: Stock insuficiente (real: {stock_real}).")
                             else:
-                                # update stock
                                 supabase.table("inventario").update({"stock": stock_real - int(cantidad)}).eq("id", id_prod).execute()
 
-                                # insert finanzas estructurado
                                 supabase.table("finanzas").insert({
-                                    "fecha": datetime.utcnow().isoformat(),
+                                    "fecha": now_ar_str(),
                                     "tipo": "Ingreso",
                                     "descripcion": desc,
                                     "monto": float(total_cobrado),
@@ -469,7 +506,7 @@ with tab3:
             else:
                 try:
                     supabase.table("finanzas").insert({
-                        "fecha": datetime.utcnow().isoformat(),
+                        "fecha": now_ar_str(),
                         "tipo": "Gasto",
                         "descripcion": desc,
                         "monto": -float(monto)
@@ -482,20 +519,20 @@ with tab3:
                     st.error(f"Error: {e}")
 
 # =========================================================
-# TAB 4: FINANZAS (SOLO ACÁ se muestra la tabla)
+# TAB 4: FINANZAS
 # =========================================================
 with tab4:
     st.header("📊 Finanzas")
 
-    df_work = df_fin.copy() if not df_fin.empty else pd.DataFrame(columns=["id", "fecha", "tipo", "descripcion", "monto", "producto_id", "cantidad", "metodo_pago"])
+    df_work = df_fin.copy() if not df_fin.empty else pd.DataFrame(
+        columns=["id", "fecha", "tipo", "descripcion", "monto", "producto_id", "cantidad", "metodo_pago"]
+    )
 
-    # filtro por mes
     filtro_txt = "Todos los tiempos"
     df_fil = df_work.copy()
 
     if not df_work.empty:
         df_work2 = formatear_fecha_arg(df_work)
-        # mes de la fecha_dt (ya en AR si se pudo)
         df_work2["mes"] = pd.to_datetime(df_work2["fecha_dt"], errors="coerce").dt.strftime("%Y-%m")
         meses = ["Todos los tiempos"] + sorted(df_work2["mes"].dropna().unique().tolist(), reverse=True)
 
@@ -506,8 +543,6 @@ with tab4:
             df_fil = df_work2[df_work2["mes"] == filtro_txt].copy()
         else:
             df_fil = df_work2.copy()
-    else:
-        df_fil = df_work.copy()
 
     # métricas
     if not df_fil.empty:
@@ -524,12 +559,10 @@ with tab4:
 
     st.divider()
 
-    # borrar/restituir
     with st.expander("🗑️ Corregir / Eliminar movimiento (restituye stock si es venta)"):
         if df_work.empty:
             st.info("Nada para borrar.")
         else:
-            # selector más lindo
             base = df_work.copy()
             base["id"] = pd.to_numeric(base["id"], errors="coerce")
             base = base.dropna(subset=["id"]).copy()
@@ -538,32 +571,38 @@ with tab4:
             base_fmt = formatear_fecha_arg(base)
             base_fmt["monto_fmt"] = base_fmt["monto"].apply(formatear_monto_ars)
 
-            def label_row(r):
-                f = r.get("fecha_fmt", str(r.get("fecha", "")))
-                return f"{f} | {r.get('tipo','')} | {r.get('descripcion','')} | {r.get('monto_fmt','')} | (ID:{int(r['id'])})"
-
             base_fmt = base_fmt.sort_values("id", ascending=False)
 
             busq = st.text_input("🔍 Buscar", placeholder="Ej: labial / 1500 / efectivo").strip()
             show = base_fmt
             if busq:
-                mask = show["descripcion"].str.contains(busq, case=False, na=False) | show["tipo"].astype(str).str.contains(busq, case=False, na=False)
+                mask = (
+                    show["descripcion"].str.contains(busq, case=False, na=False)
+                    | show["tipo"].astype(str).str.contains(busq, case=False, na=False)
+                )
                 show = show[mask]
 
             if show.empty:
                 st.info("No se encontró nada con ese filtro.")
             else:
+                def label_row(r):
+                    f = r.get("fecha_fmt", str(r.get("fecha", "")))
+                    return f"{f} | {r.get('tipo','')} | {r.get('descripcion','')} | {r.get('monto_fmt','')} | (ID:{int(r['id'])})"
+
                 options = show["id"].tolist()
-                id_sel = st.selectbox("Movimiento", options=options, format_func=lambda _id: label_row(show[show["id"] == _id].iloc[0]))
+                id_sel = st.selectbox(
+                    "Movimiento",
+                    options=options,
+                    format_func=lambda _id: label_row(show[show["id"] == _id].iloc[0])
+                )
+
                 ok = st.checkbox("Confirmo borrar este movimiento", key="chk_del_mov")
 
                 if st.button("Borrar (y restituir si aplica)", type="primary", disabled=not ok):
                     try:
-                        # RPC primero
                         try:
                             supabase.rpc("borrar_movimiento_y_restituir", {"p_finanzas_id": int(id_sel)}).execute()
                         except Exception:
-                            # fallback simple: solo borra finanzas (sin restituir)
                             supabase.table("finanzas").delete().eq("id", int(id_sel)).execute()
 
                         st.toast("🗑️ Movimiento eliminado.", icon="✅")
@@ -574,17 +613,13 @@ with tab4:
 
     st.subheader(f"Detalle: {filtro_txt}")
 
-    # ✅ Acá es donde “sacamos eso feo”: mostramos fecha_fmt en vez de fecha cruda
     if not df_fil.empty:
         df_show = df_fil.copy()
-
-        # aseguramos fecha_fmt
         if "fecha_fmt" not in df_show.columns:
             df_show = formatear_fecha_arg(df_show)
 
         df_show["monto_fmt"] = df_show["monto"].apply(formatear_monto_ars)
 
-        # mostramos monto formateado (texto) y ocultamos fecha fea
         tabla = df_show.sort_values("id", ascending=False)[["fecha_fmt", "tipo", "descripcion", "monto_fmt"]].copy()
         tabla.columns = ["Fecha", "Tipo", "Descripción", "Monto"]
 
@@ -593,7 +628,7 @@ with tab4:
         st.info("No hay movimientos para mostrar.")
 
 # =========================================================
-# TAB 5: ABOUT (dedicatoria aparte)
+# TAB 5: ABOUT
 # =========================================================
 with tab5:
     st.header("💌 About")
@@ -609,4 +644,3 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
-
