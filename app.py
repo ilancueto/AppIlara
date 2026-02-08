@@ -55,15 +55,12 @@ def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
 
     out = df.copy()
 
-    # parse robusto
     out["fecha_dt"] = pd.to_datetime(out["fecha"], errors="coerce", utc=True)
 
-    # si algunos no quedaron utc, intento sin utc
     mask_na = out["fecha_dt"].isna()
     if mask_na.any():
         out.loc[mask_na, "fecha_dt"] = pd.to_datetime(out.loc[mask_na, "fecha"], errors="coerce")
 
-    # convertir a Argentina si tiene tz
     try:
         out["fecha_dt"] = out["fecha_dt"].dt.tz_convert(TZ_AR)
     except Exception:
@@ -76,7 +73,7 @@ def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
 # =========================================================
 # CARGA DE DATOS (cache)
 # =========================================================
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def cargar_inventario():
     try:
         res = supabase.table("inventario").select("*").execute()
@@ -84,7 +81,7 @@ def cargar_inventario():
     except:
         return pd.DataFrame()
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def cargar_finanzas():
     try:
         res = supabase.table("finanzas").select("*").execute()
@@ -115,7 +112,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.0.2</div>
+    <div class="footer-fixed">by ChadGpt e Ilan con amor · v3.0.3</div>
     """,
     unsafe_allow_html=True
 )
@@ -149,62 +146,27 @@ if not df_fin.empty:
     df_fin["descripcion"] = df_fin["descripcion"].astype(str)
     df_fin["monto"] = pd.to_numeric(df_fin.get("monto", 0), errors="coerce").fillna(0.0)
 
-    # columnas nuevas si no existieran
     for col in ["producto_id", "cantidad", "metodo_pago"]:
         if col not in df_fin.columns:
             df_fin[col] = None
 
 # =========================================================
-# NAVEGACIÓN (persistente con URL) — no vuelve al inicio ni con F5
+# TABS (tradicional)
 # =========================================================
-pages = ["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "💌 About"]
-
-page_to_slug = {
-    "📦 Inventario": "inventario",
-    "💰 Nueva Venta": "venta",
-    "💸 Nuevo Gasto": "gasto",
-    "📊 Finanzas": "finanzas",
-    "💌 About": "about",
-}
-slug_to_page = {v: k for k, v in page_to_slug.items()}
-
-# leer query param (compatible con APIs vieja/nueva)
-try:
-    qp = st.query_params
-    slug = qp.get("page", None)
-except Exception:
-    qp = st.experimental_get_query_params()
-    slug = qp.get("page", [None])[0]
-
-default_page = slug_to_page.get(slug, "📦 Inventario")
-
-def set_page_param():
-    selected = st.session_state["page_nav"]
-    slug_new = page_to_slug.get(selected, "inventario")
-    try:
-        st.query_params["page"] = slug_new
-    except Exception:
-        st.experimental_set_query_params(page=slug_new)
-
-st.sidebar.title("Ilara Beauty 💄")
-page = st.sidebar.radio(
-    "Ir a:",
-    pages,
-    index=pages.index(default_page),
-    key="page_nav",
-    on_change=set_page_param
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "💌 About"]
 )
 
 # =========================================================
-# PAGE: INVENTARIO
+# TAB 1: INVENTARIO
 # =========================================================
-if page == "📦 Inventario":
+with tab1:
     st.header("📦 Gestión de Productos")
 
     if df_inv.empty:
         st.info("Inventario vacío. Agregá el primer producto.")
     else:
-        col_rep1, _ = st.columns([3, 1])
+        col_rep1, col_rep2 = st.columns([3, 1])
         with col_rep1:
             umbral = st.slider("⚠️ Umbral de alerta de stock", 1, 10, 3)
 
@@ -216,7 +178,9 @@ if page == "📦 Inventario":
 
     st.divider()
 
-    sub_ver, sub_add, sub_edit, sub_ajuste, sub_del = st.tabs(["🔍 Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"])
+    sub_ver, sub_add, sub_edit, sub_ajuste, sub_del = st.tabs(
+        ["🔍 Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"]
+    )
 
     # Buscar
     with sub_ver:
@@ -400,16 +364,16 @@ if page == "📦 Inventario":
                     st.error(f"Error: {e}")
 
 # =========================================================
-# PAGE: VENTA (FIX total sugerido + callback seguro)
+# TAB 2: VENTA (FIX total sugerido + callback)
 # =========================================================
-elif page == "💰 Nueva Venta":
+with tab2:
     st.header("💰 Registrar Venta")
 
     if df_inv.empty:
         st.warning("Primero cargá productos en Inventario.")
     else:
         opciones = df_inv["display"].unique()
-        sel = st.selectbox("Producto a vender", opciones, key="venta_producto")
+        sel = st.selectbox("Producto a vender", opciones)
 
         if sel:
             row = df_inv[df_inv["display"] == sel].iloc[0]
@@ -500,11 +464,11 @@ elif page == "💰 Nueva Venta":
                             stock_real = int(check.data.get("stock", 0))
 
                             if stock_real < int(cantidad):
-                                st.error(f"❌ No se pudo registrar la venta: Stock insuficiente (real: {stock_real}).")
+                                st.error(f"❌ No seo se pudo registrar la venta: Stock insuficiente (real: {stock_real}).")
                             else:
                                 supabase.table("inventario").update({"stock": stock_real - int(cantidad)}).eq("id", id_prod).execute()
 
-                                supabase.table("finanzas").insert({
+                                supa_base = supabase.table("finanzas").insert({
                                     "fecha": now_ar_str(),
                                     "tipo": "Ingreso",
                                     "descripcion": desc,
@@ -521,9 +485,9 @@ elif page == "💰 Nueva Venta":
                             st.error(f"Error: {e2}")
 
 # =========================================================
-# PAGE: GASTO
+# TAB 3: GASTO
 # =========================================================
-elif page == "💸 Nuevo Gasto":
+with tab3:
     st.header("💸 Registrar Gasto")
 
     with st.form("form_gasto"):
@@ -548,9 +512,9 @@ elif page == "💸 Nuevo Gasto":
                     st.error(f"Error: {e}")
 
 # =========================================================
-# PAGE: FINANZAS
+# TAB 4: FINANZAS
 # =========================================================
-elif page == "📊 Finanzas":
+with tab4:
     st.header("📊 Finanzas")
 
     df_work = df_fin.copy() if not df_fin.empty else pd.DataFrame(
@@ -573,7 +537,6 @@ elif page == "📊 Finanzas":
         else:
             df_fil = df_work2.copy()
 
-    # métricas
     if not df_fil.empty:
         ingresos = df_fil[df_fil["monto"] > 0]["monto"].sum()
         gastos = df_fil[df_fil["monto"] < 0]["monto"].sum()
@@ -599,7 +562,6 @@ elif page == "📊 Finanzas":
 
             base_fmt = formatear_fecha_arg(base)
             base_fmt["monto_fmt"] = base_fmt["monto"].apply(formatear_monto_ars)
-
             base_fmt = base_fmt.sort_values("id", ascending=False)
 
             busq = st.text_input("🔍 Buscar", placeholder="Ej: labial / 1500 / efectivo").strip()
@@ -657,9 +619,9 @@ elif page == "📊 Finanzas":
         st.info("No hay movimientos para mostrar.")
 
 # =========================================================
-# PAGE: ABOUT
+# TAB 5: ABOUT
 # =========================================================
-elif page == "💌 About":
+with tab5:
     st.header("💌 About")
     st.write("Esta app está hecha para ordenar stock, ventas y gastos de **Ilara Beauty**.")
     st.divider()
