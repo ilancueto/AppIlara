@@ -2,16 +2,18 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-import time
+import pytz
 
-# =========================
-# CONFIG PÁGINA
-# =========================
+# =========================================================
+# CONFIG
+# =========================================================
 st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 
-# =========================
-# CONEXIÓN SUPABASE (CACHEADA)
-# =========================
+TZ_AR = pytz.timezone("America/Argentina/Buenos_Aires")
+
+# =========================================================
+# CONEXIÓN SUPABASE (cacheada)
+# =========================================================
 try:
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
@@ -23,237 +25,269 @@ try:
     supabase: Client = init_connection()
 
 except Exception:
-    st.error("❌ Error de conexión: Revisa tus secretos (.streamlit/secrets.toml).")
+    st.error("❌ Error de conexión: Revisá tus secretos (.streamlit/secrets.toml).")
     st.stop()
 
-# =========================
-# CARGA DE DATOS (CACHEADA)
-# =========================
+# =========================================================
+# HELPERS
+# =========================================================
+def limpiar_cache():
+    st.cache_data.clear()
+
+def now_ar_str():
+    return datetime.now(TZ_AR).strftime("%d/%m/%Y %H:%M")
+
+def formatear_monto_ars(x):
+    try:
+        # Si querés 0 decimales:
+        # return f"${float(x):,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        # Con 2 decimales:
+        return f"${float(x):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return str(x)
+
+def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convierte timestamps (UTC o ISO) a hora Argentina y formatea.
+    Si ya viniera como string, intenta parsear.
+    """
+    if df.empty or "fecha" not in df.columns:
+        return df
+
+    out = df.copy()
+
+    # parse robusto
+    out["fecha_dt"] = pd.to_datetime(out["fecha"], errors="coerce", utc=True)
+
+    # si algunos no quedaron utc, intento sin utc
+    mask_na = out["fecha_dt"].isna()
+    if mask_na.any():
+        out.loc[mask_na, "fecha_dt"] = pd.to_datetime(out.loc[mask_na, "fecha"], errors="coerce")
+
+    # convertir a Argentina si tiene tz
+    try:
+        out["fecha_dt"] = out["fecha_dt"].dt.tz_convert(TZ_AR)
+    except Exception:
+        # si no tiene tz, la dejamos y formateamos igual
+        pass
+
+    out["fecha_fmt"] = out["fecha_dt"].dt.strftime("%d/%m/%Y %H:%M")
+    out["fecha_fmt"] = out["fecha_fmt"].fillna(out["fecha"].astype(str))
+    return out
+
+# =========================================================
+# CARGA DE DATOS (cache)
+# =========================================================
 @st.cache_data(ttl=60)
 def cargar_inventario():
     try:
-        resp = supabase.table("inventario").select("*").execute()
-        return pd.DataFrame(resp.data)
+        res = supabase.table("inventario").select("*").execute()
+        return pd.DataFrame(res.data)
     except:
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def cargar_finanzas():
     try:
-        resp = supabase.table("finanzas").select("*").execute()
-        return pd.DataFrame(resp.data)
+        res = supabase.table("finanzas").select("*").execute()
+        return pd.DataFrame(res.data)
     except:
         return pd.DataFrame()
 
-def limpiar_cache():
-    st.cache_data.clear()
+# =========================================================
+# UI HEADER + FOOTER
+# =========================================================
+st.title("💅 Ilara Beauty — Stock, Ventas y Finanzas")
 
-# =========================
-# UI HEADER
-# =========================
-st.title("💅 Ilara Beauty — Gestión de Stock y Ventas")
+# Footer fijo
+st.markdown(
+    """
+    <style>
+    .footer-fixed {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        padding: 8px 0;
+        text-align: center;
+        font-size: 12px;
+        opacity: 0.75;
+        background: rgba(0,0,0,0.0);
+        z-index: 999;
+        pointer-events: none;
+    }
+    </style>
+    <div class="footer-fixed">by ChadGpt e Ilan con amor · v3</div>
+    """,
+    unsafe_allow_html=True
+)
 
-# =========================
-# DATA LOAD
-# =========================
+# =========================================================
+# DATA
+# =========================================================
 df_inv = cargar_inventario()
 df_fin = cargar_finanzas()
 
-# =========================
-# BLINDAJE / NORMALIZACIÓN (DFs)
-# =========================
+# Blindajes inventario
 if not df_inv.empty:
     for col in ["producto", "marca", "categoria"]:
         if col not in df_inv.columns:
             df_inv[col] = ""
+        df_inv[col] = df_inv[col].astype(str)
 
-    df_inv["producto"] = df_inv["producto"].astype(str)
-    df_inv["marca"] = df_inv["marca"].astype(str)
-    df_inv["categoria"] = df_inv["categoria"].astype(str)
+    df_inv["display"] = df_inv["producto"] + " - " + df_inv["marca"]
 
-    if "stock" not in df_inv.columns:
-        df_inv["stock"] = 0
-    if "precio_costo" not in df_inv.columns:
-        df_inv["precio_costo"] = 0.0
-    if "precio_venta" not in df_inv.columns:
-        df_inv["precio_venta"] = 0.0
+    df_inv["stock"] = pd.to_numeric(df_inv.get("stock", 0), errors="coerce").fillna(0).astype(int)
+    df_inv["precio_costo"] = pd.to_numeric(df_inv.get("precio_costo", 0), errors="coerce").fillna(0.0)
+    df_inv["precio_venta"] = pd.to_numeric(df_inv.get("precio_venta", 0), errors="coerce").fillna(0.0)
 
-    df_inv["stock"] = pd.to_numeric(df_inv["stock"], errors="coerce").fillna(0).astype(int)
-    df_inv["precio_costo"] = pd.to_numeric(df_inv["precio_costo"], errors="coerce").fillna(0.0)
-    df_inv["precio_venta"] = pd.to_numeric(df_inv["precio_venta"], errors="coerce").fillna(0.0)
-
-    df_inv["display"] = df_inv["producto"].str.strip() + " - " + df_inv["marca"].str.strip()
-
-    # key normalizada para detectar duplicados localmente
+    # key local robusta (para duplicados)
     df_inv["key"] = df_inv["producto"].str.strip().str.lower() + "_" + df_inv["marca"].str.strip().str.lower()
 
+# Blindajes finanzas
 if not df_fin.empty:
-    for col in ["descripcion", "tipo", "fecha", "monto"]:
-        if col not in df_fin.columns:
-            df_fin[col] = None
-
+    if "descripcion" not in df_fin.columns:
+        df_fin["descripcion"] = ""
     df_fin["descripcion"] = df_fin["descripcion"].astype(str)
-    df_fin["tipo"] = df_fin["tipo"].astype(str)
-    df_fin["fecha"] = df_fin["fecha"].astype(str)
-    df_fin["monto"] = pd.to_numeric(df_fin["monto"], errors="coerce").fillna(0.0)
+    df_fin["monto"] = pd.to_numeric(df_fin.get("monto", 0), errors="coerce").fillna(0.0)
 
-    # columnas nuevas (si existen)
-    for col in ["producto_id", "cantidad", "metodo_pago", "cliente_nota"]:
+    # columnas nuevas si no existieran
+    for col in ["producto_id", "cantidad", "metodo_pago"]:
         if col not in df_fin.columns:
             df_fin[col] = None
 
-# =========================
-# TABS PRINCIPALES
-# =========================
+# =========================================================
+# TABS
+# =========================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "💌 About"])
 
 # =========================================================
-# TAB 1 — INVENTARIO
+# TAB 1: INVENTARIO
 # =========================================================
 with tab1:
-    st.header("📦 Inventario")
+    st.header("📦 Gestión de Productos")
 
     if df_inv.empty:
-        st.info("Todavía no hay productos cargados.")
+        st.info("Inventario vacío. Agregá el primer producto.")
     else:
         col_rep1, col_rep2 = st.columns([3, 1])
         with col_rep1:
-            umbral = st.slider("⚠️ Umbral de alerta de stock bajo", 1, 20, 3)
-        criticos = df_inv[df_inv["stock"] <= umbral].sort_values("stock")
+            umbral = st.slider("⚠️ Umbral de alerta de stock", 1, 10, 3)
 
+        criticos = df_inv[df_inv["stock"] <= umbral].sort_values("stock")
         if not criticos.empty:
-            st.warning(f"⚠️ Hay {len(criticos)} productos con stock bajo ({umbral} o menos).")
+            st.warning(f"⚠️ {len(criticos)} producto(s) con stock crítico ({umbral} o menos).")
             with st.expander("Ver lista crítica"):
-                st.dataframe(criticos[["producto", "marca", "categoria", "stock"]], use_container_width=True, hide_index=True)
-                csv = criticos.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Descargar CSV", csv, "stock_bajo.csv", "text/csv")
+                st.dataframe(criticos[["producto", "marca", "stock"]], use_container_width=True, hide_index=True)
 
     st.divider()
 
-    subtab_ver, subtab_add, subtab_edit, subtab_ajuste, subtab_del = st.tabs(
-        ["🔍 Ver/Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"]
-    )
+    sub_ver, sub_add, sub_edit, sub_ajuste, sub_del = st.tabs(["🔍 Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"])
 
-    # -------------------------
-    # VER / BUSCAR
-    # -------------------------
-    with subtab_ver:
+    # Buscar
+    with sub_ver:
         if df_inv.empty:
-            st.info("Inventario vacío.")
+            st.info("No hay productos.")
         else:
-            col_search, col_filter = st.columns([2, 1])
-            search_term = col_search.text_input("🔍 Buscar por nombre o marca:", placeholder="Ej: Rimel")
-            cats = sorted([c for c in df_inv["categoria"].dropna().unique().tolist() if c.strip() != ""])
-            cat_filter = col_filter.multiselect("Filtrar categoría", cats)
+            c1, c2 = st.columns([2, 1])
+            term = c1.text_input("🔍 Buscar por nombre o marca", placeholder="Ej: Rimel")
+            cats = sorted(df_inv["categoria"].dropna().unique().tolist())
+            filt_cat = c2.multiselect("Filtrar categoría", cats)
 
-            df_view = df_inv.copy()
-            if search_term:
-                df_view = df_view[df_view["display"].str.contains(search_term, case=False, na=False)]
-            if cat_filter:
-                df_view = df_view[df_view["categoria"].isin(cat_filter)]
+            view = df_inv.copy()
+            if term:
+                view = view[view["display"].str.contains(term, case=False, na=False)]
+            if filt_cat:
+                view = view[view["categoria"].isin(filt_cat)]
 
-            df_view["Ganancia"] = df_view["precio_venta"] - df_view["precio_costo"]
-            st.dataframe(
-                df_view[["producto", "marca", "categoria", "stock", "precio_costo", "precio_venta", "Ganancia"]]
-                .sort_values(["categoria", "producto"], ascending=True),
-                use_container_width=True,
-                hide_index=True,
-            )
+            view["ganancia"] = view["precio_venta"] - view["precio_costo"]
 
-    # -------------------------
-    # AGREGAR / REPONER
-    # -------------------------
-    with subtab_add:
-        with st.form("nuevo_prod"):
-            st.caption("Si el nombre y marca coinciden, suma stock al existente.")
-            c1, c2 = st.columns(2)
+            view_show = view[["producto", "marca", "categoria", "stock", "precio_costo", "precio_venta", "ganancia"]].copy()
+            view_show.rename(columns={
+                "producto": "Producto",
+                "marca": "Marca",
+                "categoria": "Categoría",
+                "stock": "Stock",
+                "precio_costo": "Costo",
+                "precio_venta": "Venta",
+                "ganancia": "Ganancia"
+            }, inplace=True)
 
-            nom = c1.text_input("Nombre").strip()
-            marca = c2.text_input("Marca").strip()
+            st.dataframe(view_show, use_container_width=True, hide_index=True)
+
+    # Agregar / reponer
+    with sub_add:
+        with st.form("form_add"):
+            st.caption("Si Nombre+Marca ya existe, suma stock.")
+            a, b = st.columns(2)
+            nom = a.text_input("Nombre").strip()
+            marca = b.text_input("Marca").strip()
             marca_final = marca if marca else "Genérico"
 
-            cat = c1.selectbox("Categoría", ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"])
-            stk_input = c2.number_input("Cantidad", min_value=1, value=1)
+            cat = a.selectbox("Categoría", ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"])
+            cant = b.number_input("Cantidad", min_value=1, value=1)
 
-            costo = c1.number_input("Costo ($)", min_value=0.0, value=None, placeholder="0.00")
-            venta = c2.number_input("Venta ($)", min_value=0.0, value=None, placeholder="0.00")
+            costo = a.number_input("Costo ($)", min_value=0.0, value=None, placeholder="0,00")
+            venta = b.number_input("Venta ($)", min_value=0.0, value=None, placeholder="0,00")
 
             if st.form_submit_button("Guardar"):
                 if not nom or costo is None or venta is None:
-                    st.error("⚠️ Faltan datos: Nombre, Costo y Venta son obligatorios.")
+                    st.error("⚠️ Faltan datos (Nombre, Costo y Venta).")
                 else:
                     try:
-                        key_input = nom.lower().strip() + "_" + marca_final.lower().strip()
-
-                        if not df_inv.empty and "key" in df_inv.columns:
-                            match = df_inv[df_inv["key"] == key_input]
-                        else:
-                            match = pd.DataFrame()
+                        key_in = nom.lower() + "_" + marca_final.lower()
+                        match = df_inv[df_inv["key"] == key_in] if not df_inv.empty else pd.DataFrame()
 
                         if not match.empty:
                             prod = match.iloc[0]
-                            nuevo_stock = int(prod["stock"]) + int(stk_input)
-
+                            new_stock = int(prod["stock"]) + int(cant)
                             supabase.table("inventario").update({
-                                "stock": nuevo_stock,
+                                "stock": new_stock,
                                 "precio_costo": float(costo),
                                 "precio_venta": float(venta),
                                 "categoria": cat
                             }).eq("id", int(prod["id"])).execute()
-
-                            st.toast(f"🔄 Stock sumado a {nom}", icon="✅")
-
+                            st.toast(f"🔄 Stock actualizado: {prod['stock']} ➝ {new_stock}", icon="✅")
                         else:
                             supabase.table("inventario").insert({
                                 "producto": nom,
                                 "marca": marca_final,
                                 "categoria": cat,
-                                "stock": int(stk_input),
+                                "stock": int(cant),
                                 "precio_costo": float(costo),
                                 "precio_venta": float(venta)
                             }).execute()
-
-                            st.toast(f"✅ Nuevo producto: {nom}", icon="✨")
+                            st.toast(f"✨ Nuevo producto: {nom}", icon="✅")
 
                         limpiar_cache()
                         st.rerun()
-
                     except Exception as e:
-                        st.error(f"Error al guardar: {e}")
+                        st.error(f"Error: {e}")
 
-    # -------------------------
-    # EDITAR
-    # -------------------------
-    with subtab_edit:
+    # Editar
+    with sub_edit:
         if df_inv.empty:
-            st.info("Primero cargá productos.")
+            st.info("Cargá productos primero.")
         else:
-            opciones_edit = df_inv["display"].tolist()
-            seleccion_edit = st.selectbox("Producto a editar:", options=opciones_edit)
+            sel = st.selectbox("Producto a editar", df_inv["display"].tolist())
+            row = df_inv[df_inv["display"] == sel].iloc[0]
 
-            fila_edit = df_inv[df_inv["display"] == seleccion_edit].iloc[0]
-
-            with st.form("form_editar"):
-                c1, c2 = st.columns(2)
-
-                new_nom = c1.text_input("Nombre", value=str(fila_edit["producto"])).strip()
-                new_marca = c2.text_input("Marca", value=str(fila_edit["marca"])).strip()
+            with st.form("form_edit"):
+                a, b = st.columns(2)
+                new_nom = a.text_input("Nombre", value=row["producto"]).strip()
+                new_marca = b.text_input("Marca", value=row["marca"]).strip()
 
                 cats = ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"]
-                try:
-                    cat_idx = cats.index(str(fila_edit["categoria"]))
-                except:
-                    cat_idx = 0
+                idx = cats.index(row["categoria"]) if row["categoria"] in cats else 0
+                new_cat = a.selectbox("Categoría", cats, index=idx)
 
-                new_cat = c1.selectbox("Categoría", cats, index=cat_idx)
-                new_costo = c1.number_input("Costo ($)", min_value=0.0, value=float(fila_edit["precio_costo"]))
-                new_venta = c2.number_input("Venta ($)", min_value=0.0, value=float(fila_edit["precio_venta"]))
+                new_costo = a.number_input("Costo ($)", min_value=0.0, value=float(row["precio_costo"]))
+                new_venta = b.number_input("Venta ($)", min_value=0.0, value=float(row["precio_venta"]))
 
-                if st.form_submit_button("💾 Guardar cambios"):
+                if st.form_submit_button("Guardar cambios"):
                     try:
-                        id_actual = int(fila_edit["id"])
-                        new_key = new_nom.lower().strip() + "_" + new_marca.lower().strip()
-
+                        id_actual = int(row["id"])
+                        new_key = new_nom.lower() + "_" + new_marca.lower()
                         dup = df_inv[(df_inv["key"] == new_key) & (df_inv["id"] != id_actual)]
                         if not dup.empty:
                             st.error("❌ Ya existe otro producto con ese Nombre+Marca.")
@@ -266,81 +300,73 @@ with tab1:
                                 "precio_venta": float(new_venta)
                             }).eq("id", id_actual).execute()
 
-                            st.toast("✅ Producto editado.", icon="💾")
+                            st.toast("💾 Producto editado.", icon="✅")
                             limpiar_cache()
                             st.rerun()
-
                     except Exception as e:
-                        st.error(f"Error al editar: {e}")
+                        st.error(f"Error: {e}")
 
-    # -------------------------
-    # AJUSTE DE STOCK
-    # -------------------------
-    with subtab_ajuste:
+    # Ajuste
+    with sub_ajuste:
         if df_inv.empty:
             st.info("Sin productos.")
         else:
-            with st.form("form_ajuste"):
-                prod_ajuste = st.selectbox("Producto:", df_inv["display"].unique())
-                tipo_ajuste = st.radio("Tipo:", ["Resta (Pérdida/Regalo)", "Suma (Encontré stock)"])
-                cant_ajuste = st.number_input("Cantidad", min_value=1, value=1)
-                motivo = st.text_input("Motivo (obligatorio)", placeholder="Ej: Se rompió / Regalo").strip()
+            with st.form("form_adj"):
+                prod = st.selectbox("Producto", df_inv["display"].unique())
+                tipo = st.radio("Tipo", ["Resta (Pérdida/Regalo)", "Suma (Encontré stock)"])
+                cant = st.number_input("Cantidad", min_value=1, value=1)
+                motivo = st.text_input("Motivo (obligatorio)", placeholder="Ej: roto / regalo").strip()
 
                 if st.form_submit_button("Aplicar ajuste"):
                     if not motivo:
-                        st.error("⚠️ Falta el motivo.")
+                        st.error("⚠️ Motivo obligatorio.")
                     else:
                         try:
-                            fila = df_inv[df_inv["display"] == prod_ajuste].iloc[0]
-                            id_prod = int(fila["id"])
-                            stock_actual = int(fila["stock"])
+                            row = df_inv[df_inv["display"] == prod].iloc[0]
+                            id_prod = int(row["id"])
+                            stock_act = int(row["stock"])
+                            new_stock = stock_act - int(cant) if "Resta" in tipo else stock_act + int(cant)
 
-                            nuevo_stock = stock_actual - int(cant_ajuste) if "Resta" in tipo_ajuste else stock_actual + int(cant_ajuste)
-                            if nuevo_stock < 0:
-                                st.error(f"❌ No podés restar {cant_ajuste}. Solo hay {stock_actual}.")
+                            if new_stock < 0:
+                                st.error(f"❌ No podés dejar stock negativo. Tenés {stock_act}.")
                             else:
-                                supabase.table("inventario").update({"stock": nuevo_stock}).eq("id", id_prod).execute()
+                                supabase.table("inventario").update({"stock": new_stock}).eq("id", id_prod).execute()
 
-                                signo = "-" if "Resta" in tipo_ajuste else "+"
-                                desc_ajuste = f"Ajuste: {signo}{int(cant_ajuste)}x {fila['producto']} ({fila['marca']}) | Motivo: {motivo}"
-
+                                signo = "-" if "Resta" in tipo else "+"
                                 supabase.table("finanzas").insert({
-                                    "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                    "fecha": datetime.utcnow().isoformat(),
                                     "tipo": "Ajuste",
-                                    "descripcion": desc_ajuste,
+                                    "descripcion": f"Ajuste: {signo}{cant}x {row['producto']} ({row['marca']}) | Motivo: {motivo}",
                                     "monto": 0.0
                                 }).execute()
 
-                                st.toast("✅ Ajuste registrado.", icon="📉")
+                                st.toast("📉 Ajuste registrado.", icon="✅")
                                 limpiar_cache()
                                 st.rerun()
-
                         except Exception as e:
-                            st.error(f"Error en ajuste: {e}")
+                            st.error(f"Error: {e}")
 
-    # -------------------------
-    # ELIMINAR PRODUCTO
-    # -------------------------
-    with subtab_del:
+    # Eliminar
+    with sub_del:
         if df_inv.empty:
-            st.info("Nada para eliminar.")
+            st.info("Sin productos.")
         else:
-            st.warning("⚠️ Esto borra el producto del inventario. (Las ventas pasadas quedan en finanzas).")
-            elegido = st.selectbox("Producto a eliminar:", df_inv["display"].tolist())
-            confirmado = st.checkbox("Estoy seguro de eliminar este producto", key="chk_del_producto")
+            st.warning("⚠️ Borra el producto del inventario (no borra ventas pasadas).")
+            prod = st.selectbox("Producto a eliminar", df_inv["display"].tolist())
+            ok = st.checkbox("Estoy seguro de eliminar este producto", key="chk_del_prod")
 
-            if st.button("Eliminar definitivamente", type="primary", disabled=not confirmado):
+            if st.button("Eliminar definitivamente", type="primary", disabled=not ok):
                 try:
-                    fila = df_inv[df_inv["display"] == elegido].iloc[0]
-                    supabase.table("inventario").delete().eq("id", int(fila["id"])).execute()
-                    st.toast("🗑️ Producto eliminado.", icon="👋")
+                    row = df_inv[df_inv["display"] == prod].iloc[0]
+                    supabase.table("inventario").delete().eq("id", int(row["id"])).execute()
+                    st.toast("🗑️ Producto eliminado.", icon="✅")
                     limpiar_cache()
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error al eliminar: {e}")
+                    st.error(f"Error: {e}")
 
 # =========================================================
-# TAB 2 — REGISTRAR VENTA (CON CAMPOS ESTRUCTURADOS)
+# TAB 2: VENTA (RPC primero)
 # =========================================================
 with tab2:
     st.header("💰 Registrar Venta")
@@ -349,264 +375,222 @@ with tab2:
         st.warning("Primero cargá productos en Inventario.")
     else:
         opciones = df_inv["display"].unique()
-        seleccion = st.selectbox("Producto a vender", opciones)
+        sel = st.selectbox("Producto a vender", opciones)
 
-        fila_local = df_inv[df_inv["display"] == seleccion].iloc[0]
-        precio_unit = float(fila_local.get("precio_venta", 0))
-        stock_local = int(fila_local.get("stock", 0))
-        id_prod = int(fila_local.get("id", 0))
-        nombre_real = str(fila_local.get("producto", "Desconocido"))
-        marca_real = str(fila_local.get("marca", "Genérico"))
+        if sel:
+            row = df_inv[df_inv["display"] == sel].iloc[0]
+            id_prod = int(row["id"])
+            stock_est = int(row["stock"])
+            precio_unit = float(row["precio_venta"])
 
-        c1, c2 = st.columns(2)
-        c1.metric("Precio Unitario", f"${precio_unit:,.0f}")
-        c2.metric("Stock (estimado)", f"{stock_local} u.")
+            c1, c2 = st.columns(2)
+            c1.metric("Precio Unitario", formatear_monto_ars(precio_unit))
+            c2.metric("Stock (estimado)", f"{stock_est} u.")
 
-        if stock_local <= 0:
-            st.error("❌ Producto agotado (stock 0).")
-        else:
-            col_cant, col_total = st.columns(2)
+            if stock_est <= 0:
+                st.error("❌ Producto agotado.")
+            else:
+                a, b = st.columns(2)
 
-            # cantidad: key única para que no “se pegue” raro entre productos
-            cantidad = col_cant.number_input(
-                "Cantidad",
-                min_value=1,
-                max_value=max(1, stock_local),
-                value=1,
-                key=f"cant_vta_{id_prod}"
-            )
+                # No te capamos por stock estimado, porque el REAL lo valida el RPC
+                cantidad = a.number_input("Cantidad", min_value=1, max_value=999, value=1, key=f"cant_{id_prod}")
+                total_calc = precio_unit * int(cantidad)
+                total_cobrado = b.number_input("Total a cobrar ($)", min_value=0.0, value=float(total_calc), key=f"total_{id_prod}")
 
-            total_calc = precio_unit * int(cantidad)
+                p1, p2 = st.columns(2)
+                metodo = p1.selectbox("Método de pago", ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"])
+                nota = p2.text_input("Cliente / Nota (opcional)", placeholder="Ej: María").strip()
 
-            # total: key única por producto
-            total_cobrado = col_total.number_input(
-                "Total a cobrar ($)",
-                min_value=0.0,
-                value=float(total_calc),
-                key=f"total_vta_{id_prod}"
-            )
+                st.divider()
 
-            c_pago, c_nota = st.columns(2)
-            metodo_pago = c_pago.selectbox(
-                "Método de Pago",
-                ["Efectivo", "Transferencia", "Cuenta Corriente (Fiado)", "Otro"],
-                key=f"pago_vta_{id_prod}"
-            )
-            cliente_nota = c_nota.text_input(
-                "Cliente / Nota",
-                placeholder="Ej: María",
-                key=f"nota_vta_{id_prod}"
-            ).strip()
+                if st.button("✅ Confirmar venta", use_container_width=True):
+                    desc = f"Venta: {int(cantidad)}x {row['producto']} ({row['marca']}) | Pago: {metodo}"
+                    if nota:
+                        desc += f" | Nota: {nota}"
 
-            if st.button("✅ Confirmar Venta", use_container_width=True):
-                try:
-                    # 1) Chequear stock REAL en DB
-                    check = supabase.table("inventario").select("stock").eq("id", id_prod).single().execute()
-                    stock_real = int(check.data.get("stock", 0))
-
-                    if stock_real < int(cantidad):
-                        st.error(f"❌ Stock insuficiente. Quedan {stock_real} reales.")
-                        st.stop()
-
-                    # 2) Descontar stock
-                    supabase.table("inventario").update({"stock": stock_real - int(cantidad)}).eq("id", id_prod).execute()
-
-                    # 3) Descripción humana (pero ya NO dependemos de esto)
-                    desc_final = f"Venta: {int(cantidad)}x {nombre_real} ({marca_real})"
-                    extras = [f"Pago: {metodo_pago}"]
-                    if cliente_nota:
-                        extras.append(f"Nota: {cliente_nota}")
-                    desc_final += " | " + " | ".join(extras)
-
-                    # 4) Insert finanzas con columnas estructuradas
+                    # 1) RPC (real)
                     try:
-                        supabase.table("finanzas").insert({
-                            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "tipo": "Ingreso",
-                            "descripcion": desc_final,
-                            "monto": float(total_cobrado),
-                            "producto_id": int(id_prod),
-                            "cantidad": int(cantidad),
-                            "metodo_pago": metodo_pago,
-                            "cliente_nota": cliente_nota if cliente_nota else None
+                        supabase.rpc("registrar_venta", {
+                            "p_producto_id": id_prod,
+                            "p_cantidad": int(cantidad),
+                            "p_monto": float(total_cobrado),
+                            "p_descripcion": desc,
+                            "p_metodo_pago": metodo
                         }).execute()
-                    except Exception as e_insert:
-                        # rollback manual
-                        supabase.table("inventario").update({"stock": stock_real}).eq("id", int(id_prod)).execute()
-                        raise e_insert
 
-                    st.toast(f"💰 Venta registrada: ${float(total_cobrado):,.0f}", icon="✅")
-                    limpiar_cache()
-                    st.rerun()
+                        st.toast("💰 Venta registrada!", icon="✅")
+                        limpiar_cache()
+                        st.rerun()
 
-                except Exception as e:
-                    st.error(f"Error al procesar venta: {e}")
+                    except Exception as e_rpc:
+                        # 2) fallback (sin RPC)
+                        try:
+                            check = supabase.table("inventario").select("stock").eq("id", id_prod).single().execute()
+                            stock_real = int(check.data.get("stock", 0))
+
+                            if stock_real < int(cantidad):
+                                st.error(f"❌ No se pudo registrar la venta: Stock insuficiente (real: {stock_real}).")
+                            else:
+                                # update stock
+                                supabase.table("inventario").update({"stock": stock_real - int(cantidad)}).eq("id", id_prod).execute()
+
+                                # insert finanzas estructurado
+                                supabase.table("finanzas").insert({
+                                    "fecha": datetime.utcnow().isoformat(),
+                                    "tipo": "Ingreso",
+                                    "descripcion": desc,
+                                    "monto": float(total_cobrado),
+                                    "producto_id": id_prod,
+                                    "cantidad": int(cantidad),
+                                    "metodo_pago": metodo
+                                }).execute()
+
+                                st.toast("💰 Venta registrada (fallback).", icon="✅")
+                                limpiar_cache()
+                                st.rerun()
+                        except Exception as e2:
+                            st.error(f"Error: {e2}")
 
 # =========================================================
-# TAB 3 — GASTOS
+# TAB 3: GASTO
 # =========================================================
 with tab3:
     st.header("💸 Registrar Gasto")
 
     with st.form("form_gasto"):
         desc = st.text_input("Descripción").strip()
-        monto = st.number_input("Monto ($)", min_value=0.0, value=None, placeholder="0.00")
-        if st.form_submit_button("Guardar Gasto"):
+        monto = st.number_input("Monto ($)", min_value=0.0, value=None, placeholder="0,00")
+        if st.form_submit_button("Guardar gasto"):
             if not desc or monto is None or float(monto) <= 0:
-                st.error("Faltan datos: descripción y monto válido.")
+                st.error("⚠️ Poné descripción y un monto válido.")
             else:
                 try:
                     supabase.table("finanzas").insert({
-                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "fecha": datetime.utcnow().isoformat(),
                         "tipo": "Gasto",
                         "descripcion": desc,
                         "monto": -float(monto)
                     }).execute()
-                    st.toast("✅ Gasto registrado.", icon="💸")
+
+                    st.toast("💸 Gasto registrado.", icon="✅")
                     limpiar_cache()
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error guardando gasto: {e}")
+                    st.error(f"Error: {e}")
 
 # =========================================================
-# TAB 4 — FINANZAS (FILTRO + BORRADO CON RESTITUCIÓN)
+# TAB 4: FINANZAS (SOLO ACÁ se muestra la tabla)
 # =========================================================
 with tab4:
     st.header("📊 Finanzas")
 
-    df_work = df_fin.copy() if not df_fin.empty else pd.DataFrame(columns=["id", "fecha", "tipo", "descripcion", "monto"])
+    df_work = df_fin.copy() if not df_fin.empty else pd.DataFrame(columns=["id", "fecha", "tipo", "descripcion", "monto", "producto_id", "cantidad", "metodo_pago"])
 
-    filtro_texto = "Todos los tiempos"
+    # filtro por mes
+    filtro_txt = "Todos los tiempos"
+    df_fil = df_work.copy()
+
     if not df_work.empty:
-        df_work["fecha_dt"] = pd.to_datetime(df_work["fecha"], errors="coerce")
-        df_work["mes"] = df_work["fecha_dt"].dt.strftime("%Y-%m")
-        meses = ["Todos los tiempos"] + sorted(df_work["mes"].dropna().unique().tolist(), reverse=True)
+        df_work2 = formatear_fecha_arg(df_work)
+        # mes de la fecha_dt (ya en AR si se pudo)
+        df_work2["mes"] = pd.to_datetime(df_work2["fecha_dt"], errors="coerce").dt.strftime("%Y-%m")
+        meses = ["Todos los tiempos"] + sorted(df_work2["mes"].dropna().unique().tolist(), reverse=True)
 
         col_f, _ = st.columns([1, 3])
-        filtro_texto = col_f.selectbox("📅 Filtrar por mes:", meses)
+        filtro_txt = col_f.selectbox("📅 Filtrar por mes", meses)
 
-        df_filtrado = df_work[df_work["mes"] == filtro_texto] if filtro_texto != "Todos los tiempos" else df_work
+        if filtro_txt != "Todos los tiempos":
+            df_fil = df_work2[df_work2["mes"] == filtro_txt].copy()
+        else:
+            df_fil = df_work2.copy()
     else:
-        df_filtrado = df_work
+        df_fil = df_work.copy()
 
-    if not df_filtrado.empty:
-        ingresos = df_filtrado[df_filtrado["monto"] > 0]["monto"].sum()
-        gastos = df_filtrado[df_filtrado["monto"] < 0]["monto"].sum()
-        balance = ingresos + gastos
+    # métricas
+    if not df_fil.empty:
+        ingresos = df_fil[df_fil["monto"] > 0]["monto"].sum()
+        gastos = df_fil[df_fil["monto"] < 0]["monto"].sum()
+        neto = ingresos + gastos
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Ventas", f"${ingresos:,.0f}")
-        c2.metric("Gastos", f"${abs(gastos):,.0f}")
-        c3.metric("Neto", f"${balance:,.0f}", delta_color="normal" if balance >= 0 else "inverse")
+        c1.metric("Ventas", formatear_monto_ars(ingresos))
+        c2.metric("Gastos", formatear_monto_ars(abs(gastos)))
+        c3.metric("Neto", formatear_monto_ars(neto), delta_color="normal" if neto >= 0 else "inverse")
     else:
-        st.info("No hay movimientos en este período.")
+        st.info("Sin movimientos para el período.")
 
     st.divider()
 
-    with st.expander("🗑️ Corregir / Eliminar Movimiento (Devuelve Stock)"):
+    # borrar/restituir
+    with st.expander("🗑️ Corregir / Eliminar movimiento (restituye stock si es venta)"):
         if df_work.empty:
             st.info("Nada para borrar.")
         else:
-            # limpieza de ids
-            df_work["id"] = pd.to_numeric(df_work.get("id", None), errors="coerce")
-            df_clean = df_work.dropna(subset=["id"]).copy()
-            df_clean["id"] = df_clean["id"].astype(int)
+            # selector más lindo
+            base = df_work.copy()
+            base["id"] = pd.to_numeric(base["id"], errors="coerce")
+            base = base.dropna(subset=["id"]).copy()
+            base["id"] = base["id"].astype(int)
 
-            busqueda = st.text_input("🔍 Buscar movimiento (texto o monto):", key="buscar_mov").strip()
+            base_fmt = formatear_fecha_arg(base)
+            base_fmt["monto_fmt"] = base_fmt["monto"].apply(formatear_monto_ars)
 
-            if busqueda:
-                m_desc = df_clean["descripcion"].str.contains(busqueda, case=False, na=False)
-                m_num = False
-                try:
-                    val = float(busqueda.replace(",", "."))
-                    m_num = df_clean["monto"].round(2) == round(val, 2)
-                except:
-                    m_num = False
-                df_sel = df_clean[m_desc | m_num].sort_values("id", ascending=False)
+            def label_row(r):
+                f = r.get("fecha_fmt", str(r.get("fecha", "")))
+                return f"{f} | {r.get('tipo','')} | {r.get('descripcion','')} | {r.get('monto_fmt','')} | (ID:{int(r['id'])})"
+
+            base_fmt = base_fmt.sort_values("id", ascending=False)
+
+            busq = st.text_input("🔍 Buscar", placeholder="Ej: labial / 1500 / efectivo").strip()
+            show = base_fmt
+            if busq:
+                mask = show["descripcion"].str.contains(busq, case=False, na=False) | show["tipo"].astype(str).str.contains(busq, case=False, na=False)
+                show = show[mask]
+
+            if show.empty:
+                st.info("No se encontró nada con ese filtro.")
             else:
-                df_sel = df_clean.sort_values("id", ascending=False)
+                options = show["id"].tolist()
+                id_sel = st.selectbox("Movimiento", options=options, format_func=lambda _id: label_row(show[show["id"] == _id].iloc[0]))
+                ok = st.checkbox("Confirmo borrar este movimiento", key="chk_del_mov")
 
-            if df_sel.empty:
-                st.info("No se encontraron movimientos.")
-            else:
-                ids = df_sel["id"].tolist()
-
-                def pretty_label(_id: int):
-                    r = df_sel[df_sel["id"] == _id].iloc[0]
-                    return f"{r['fecha']} | {r['tipo']} | {r['descripcion']} | ${float(r['monto']):,.2f} | (ID:{_id})"
-
-                id_borrar = st.selectbox("Seleccioná movimiento:", options=ids, format_func=pretty_label)
-                confirmado = st.checkbox("Confirmo borrar y (si aplica) devolver stock", key="chk_del_fin")
-
-                if st.button("Borrar ahora", type="primary", disabled=not confirmado):
+                if st.button("Borrar (y restituir si aplica)", type="primary", disabled=not ok):
                     try:
-                        fila = df_sel[df_sel["id"] == int(id_borrar)].iloc[0]
-                        desc = str(fila.get("descripcion", ""))
-                        tipo = str(fila.get("tipo", ""))
+                        # RPC primero
+                        try:
+                            supabase.rpc("borrar_movimiento_y_restituir", {"p_finanzas_id": int(id_sel)}).execute()
+                        except Exception:
+                            # fallback simple: solo borra finanzas (sin restituir)
+                            supabase.table("finanzas").delete().eq("id", int(id_sel)).execute()
 
-                        msg_stock = ""
-
-                        # Restitución (primero por ID)
-                        if tipo == "Ingreso":
-                            restituido = False
-                            try:
-                                pid = fila.get("producto_id", None)
-                                qty = fila.get("cantidad", None)
-
-                                if pd.notna(pid) and pd.notna(qty):
-                                    pid = int(pid)
-                                    qty = int(qty)
-
-                                    check = supabase.table("inventario").select("stock").eq("id", pid).single().execute()
-                                    curr_stock = int(check.data.get("stock", 0))
-
-                                    supabase.table("inventario").update({"stock": curr_stock + qty}).eq("id", pid).execute()
-                                    msg_stock = f" (Stock devuelto +{qty} por ID)"
-                                    restituido = True
-                            except:
-                                pass
-
-                            # Fallback legacy (texto)
-                            if not restituido and "Venta:" in desc:
-                                try:
-                                    desc_pura = desc.split(" | ", 1)[0]
-                                    parte_cantidad = desc_pura.split("x ", 1)[0]
-                                    cantidad_reponer = int(parte_cantidad.split(": ")[1])
-
-                                    parte_resto = desc_pura.split("x ", 1)[1]
-                                    if "(" in parte_resto and parte_resto.endswith(")"):
-                                        nombre_prod = parte_resto.rsplit(" (", 1)[0]
-                                        marca_prod = parte_resto.rsplit(" (", 1)[1].replace(")", "")
-                                    else:
-                                        nombre_prod = parte_resto
-                                        marca_prod = "Genérico"
-
-                                    q = supabase.table("inventario").select("*").eq("producto", nombre_prod).eq("marca", marca_prod).execute()
-                                    if q.data:
-                                        prod = q.data[0]
-                                        supabase.table("inventario").update({"stock": int(prod["stock"]) + cantidad_reponer}).eq("id", int(prod["id"])).execute()
-                                        msg_stock = f" (Stock devuelto +{cantidad_reponer} por texto)"
-                                except:
-                                    pass
-
-                        supabase.table("finanzas").delete().eq("id", int(id_borrar)).execute()
-                        st.toast(f"✅ Movimiento eliminado.{msg_stock}", icon="🗑️")
+                        st.toast("🗑️ Movimiento eliminado.", icon="✅")
                         limpiar_cache()
                         st.rerun()
-
                     except Exception as e:
-                        st.error(f"Error al borrar: {e}")
+                        st.error(f"Error: {e}")
 
-    st.subheader(f"Detalle: {filtro_texto}")
-    if not df_filtrado.empty:
-        st.dataframe(
-            df_filtrado.sort_values("id", ascending=False)[["fecha", "tipo", "descripcion", "monto"]],
-            use_container_width=True,
-            hide_index=True,
-        )
+    st.subheader(f"Detalle: {filtro_txt}")
+
+    # ✅ Acá es donde “sacamos eso feo”: mostramos fecha_fmt en vez de fecha cruda
+    if not df_fil.empty:
+        df_show = df_fil.copy()
+
+        # aseguramos fecha_fmt
+        if "fecha_fmt" not in df_show.columns:
+            df_show = formatear_fecha_arg(df_show)
+
+        df_show["monto_fmt"] = df_show["monto"].apply(formatear_monto_ars)
+
+        # mostramos monto formateado (texto) y ocultamos fecha fea
+        tabla = df_show.sort_values("id", ascending=False)[["fecha_fmt", "tipo", "descripcion", "monto_fmt"]].copy()
+        tabla.columns = ["Fecha", "Tipo", "Descripción", "Monto"]
+
+        st.dataframe(tabla, use_container_width=True, hide_index=True)
+    else:
+        st.info("No hay movimientos para mostrar.")
 
 # =========================================================
-# TAB 5 — ABOUT (DEDICATORIA)
+# TAB 5: ABOUT (dedicatoria aparte)
 # =========================================================
 with tab5:
     st.header("💌 About")
@@ -622,28 +606,3 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
-
-# =========================================================
-# FOOTER FIJO
-# =========================================================
-st.markdown(
-    """
-    <style>
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background: rgba(255,255,255,0.88);
-        padding: 8px 12px;
-        text-align: center;
-        font-size: 13px;
-        color: #555;
-        border-top: 1px solid rgba(0,0,0,0.08);
-        z-index: 9999;
-    }
-    </style>
-    <div class="footer">by ChadGpt e Ilan con amor · v2</div>
-    """,
-    unsafe_allow_html=True
-)
