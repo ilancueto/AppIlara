@@ -368,6 +368,9 @@ with tab1:
 # =========================================================
 # TAB 2: VENTA (RPC primero)
 # =========================================================
+# =========================================================
+# TAB 2: VENTA (RPC primero)
+# =========================================================
 with tab2:
     st.header("💰 Registrar Venta")
 
@@ -606,3 +609,4 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
