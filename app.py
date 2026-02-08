@@ -35,6 +35,7 @@ def limpiar_cache():
     st.cache_data.clear()
 
 def now_ar_str():
+    # Fecha “linda” AR (si tu columna fecha es string)
     return datetime.now(TZ_AR).strftime("%d/%m/%Y %H:%M")
 
 def formatear_monto_ars(x):
@@ -54,12 +55,15 @@ def formatear_fecha_arg(df: pd.DataFrame) -> pd.DataFrame:
 
     out = df.copy()
 
+    # parse robusto
     out["fecha_dt"] = pd.to_datetime(out["fecha"], errors="coerce", utc=True)
 
+    # si algunos no quedaron utc, intento sin utc
     mask_na = out["fecha_dt"].isna()
     if mask_na.any():
         out.loc[mask_na, "fecha_dt"] = pd.to_datetime(out.loc[mask_na, "fecha"], errors="coerce")
 
+    # convertir a Argentina si tiene tz
     try:
         out["fecha_dt"] = out["fecha_dt"].dt.tz_convert(TZ_AR)
     except Exception:
@@ -93,6 +97,7 @@ def cargar_finanzas():
 # =========================================================
 st.title("💅 Ilara Beauty — Stock, Ventas y Finanzas")
 
+# Footer fijo
 st.markdown(
     """
     <style>
@@ -110,7 +115,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by ChadGpt e Ilan con amor · v4</div>
+    <div class="footer-fixed">by Ilan con amor · v3.0.2</div>
     """,
     unsafe_allow_html=True
 )
@@ -134,6 +139,7 @@ if not df_inv.empty:
     df_inv["precio_costo"] = pd.to_numeric(df_inv.get("precio_costo", 0), errors="coerce").fillna(0.0)
     df_inv["precio_venta"] = pd.to_numeric(df_inv.get("precio_venta", 0), errors="coerce").fillna(0.0)
 
+    # key local robusta (para duplicados)
     df_inv["key"] = df_inv["producto"].str.strip().str.lower() + "_" + df_inv["marca"].str.strip().str.lower()
 
 # Blindajes finanzas
@@ -143,16 +149,51 @@ if not df_fin.empty:
     df_fin["descripcion"] = df_fin["descripcion"].astype(str)
     df_fin["monto"] = pd.to_numeric(df_fin.get("monto", 0), errors="coerce").fillna(0.0)
 
+    # columnas nuevas si no existieran
     for col in ["producto_id", "cantidad", "metodo_pago"]:
         if col not in df_fin.columns:
             df_fin[col] = None
 
 # =========================================================
-# NAVEGACIÓN (persistente) — evita que vuelva “al inicio”
+# NAVEGACIÓN (persistente con URL) — no vuelve al inicio ni con F5
 # =========================================================
 pages = ["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "💌 About"]
+
+page_to_slug = {
+    "📦 Inventario": "inventario",
+    "💰 Nueva Venta": "venta",
+    "💸 Nuevo Gasto": "gasto",
+    "📊 Finanzas": "finanzas",
+    "💌 About": "about",
+}
+slug_to_page = {v: k for k, v in page_to_slug.items()}
+
+# leer query param (compatible con APIs vieja/nueva)
+try:
+    qp = st.query_params
+    slug = qp.get("page", None)
+except Exception:
+    qp = st.experimental_get_query_params()
+    slug = qp.get("page", [None])[0]
+
+default_page = slug_to_page.get(slug, "📦 Inventario")
+
+def set_page_param():
+    selected = st.session_state["page_nav"]
+    slug_new = page_to_slug.get(selected, "inventario")
+    try:
+        st.query_params["page"] = slug_new
+    except Exception:
+        st.experimental_set_query_params(page=slug_new)
+
 st.sidebar.title("Ilara Beauty 💄")
-page = st.sidebar.radio("Ir a:", pages, key="page_nav")
+page = st.sidebar.radio(
+    "Ir a:",
+    pages,
+    index=pages.index(default_page),
+    key="page_nav",
+    on_change=set_page_param
+)
 
 # =========================================================
 # PAGE: INVENTARIO
@@ -163,7 +204,7 @@ if page == "📦 Inventario":
     if df_inv.empty:
         st.info("Inventario vacío. Agregá el primer producto.")
     else:
-        col_rep1, col_rep2 = st.columns([3, 1])
+        col_rep1, _ = st.columns([3, 1])
         with col_rep1:
             umbral = st.slider("⚠️ Umbral de alerta de stock", 1, 10, 3)
 
@@ -175,9 +216,7 @@ if page == "📦 Inventario":
 
     st.divider()
 
-    sub_ver, sub_add, sub_edit, sub_ajuste, sub_del = st.tabs(
-        ["🔍 Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"]
-    )
+    sub_ver, sub_add, sub_edit, sub_ajuste, sub_del = st.tabs(["🔍 Buscar", "➕ Agregar/Reponer", "✏️ Editar", "📉 Ajuste", "🗑️ Eliminar"])
 
     # Buscar
     with sub_ver:
@@ -361,7 +400,7 @@ if page == "📦 Inventario":
                     st.error(f"Error: {e}")
 
 # =========================================================
-# PAGE: VENTA (FIX total + no reruns por cantidad)
+# PAGE: VENTA (FIX total sugerido + callback seguro)
 # =========================================================
 elif page == "💰 Nueva Venta":
     st.header("💰 Registrar Venta")
@@ -370,7 +409,7 @@ elif page == "💰 Nueva Venta":
         st.warning("Primero cargá productos en Inventario.")
     else:
         opciones = df_inv["display"].unique()
-        sel = st.selectbox("Producto a vender", opciones)
+        sel = st.selectbox("Producto a vender", opciones, key="venta_producto")
 
         if sel:
             row = df_inv[df_inv["display"] == sel].iloc[0]
@@ -386,6 +425,7 @@ elif page == "💰 Nueva Venta":
                 st.error("❌ Producto agotado.")
             else:
                 a, b = st.columns(2)
+
                 cantidad = a.number_input(
                     "Cantidad",
                     min_value=1,
@@ -395,7 +435,6 @@ elif page == "💰 Nueva Venta":
                     key=f"cant_{id_prod}"
                 )
 
-                # --- FIX TOTAL (una sola key) ---
                 total_calc = precio_unit * int(cantidad)
 
                 total_key = f"total_{id_prod}"
@@ -406,13 +445,20 @@ elif page == "💰 Nueva Venta":
                 if total_key not in st.session_state:
                     st.session_state[total_key] = float(total_calc)
 
-                # si cambia la cantidad, arrastro el total SOLO si no lo editaron
+                # si cambia cantidad, arrastro el total SOLO si no lo editaron
                 if float(st.session_state[sug_key]) != float(total_calc):
                     if float(st.session_state[total_key]) == float(st.session_state[sug_key]):
                         st.session_state[total_key] = float(total_calc)
                     st.session_state[sug_key] = float(total_calc)
 
                 b.metric("Total sugerido", formatear_monto_ars(total_calc))
+
+                # callback seguro (evita StreamlitAPIException)
+                def usar_sugerido():
+                    st.session_state[total_key] = float(total_calc)
+                    st.session_state[sug_key] = float(total_calc)
+
+                st.button("Usar total sugerido", key=f"use_sug_{id_prod}", on_click=usar_sugerido)
 
                 total_cobrado = st.number_input(
                     "Total a cobrar ($)",
@@ -421,11 +467,6 @@ elif page == "💰 Nueva Venta":
                     step=100.0,
                     key=total_key
                 )
-
-                if st.button("Usar total sugerido", key=f"use_sug_{id_prod}"):
-                    st.session_state[total_key] = float(total_calc)
-                    st.session_state[sug_key] = float(total_calc)
-                    st.rerun()
 
                 p1, p2 = st.columns(2)
                 metodo = p1.selectbox("Método de pago", ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"])
@@ -532,6 +573,7 @@ elif page == "📊 Finanzas":
         else:
             df_fil = df_work2.copy()
 
+    # métricas
     if not df_fil.empty:
         ingresos = df_fil[df_fil["monto"] > 0]["monto"].sum()
         gastos = df_fil[df_fil["monto"] < 0]["monto"].sum()
@@ -557,6 +599,7 @@ elif page == "📊 Finanzas":
 
             base_fmt = formatear_fecha_arg(base)
             base_fmt["monto_fmt"] = base_fmt["monto"].apply(formatear_monto_ars)
+
             base_fmt = base_fmt.sort_values("id", ascending=False)
 
             busq = st.text_input("🔍 Buscar", placeholder="Ej: labial / 1500 / efectivo").strip()
