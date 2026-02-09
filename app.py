@@ -11,18 +11,44 @@ st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.markdown(
     """
     <style>
+    /* Fondo general */
     .stApp {
-        background: linear-gradient(180deg, #ffe6f0 0%, #ffffff 100%);
+        background-color: #f77eaf;
     }
 
-    h1, h2, h3 {
-        color: #cc0066;
+    /* Contenedores (cards, métricas, dataframes) */
+    div[data-testid="stMetric"],
+    div[data-testid="stDataFrame"],
+    section[data-testid="stSidebar"],
+    div[data-testid="stExpander"],
+    div[data-testid="stForm"],
+    div.block-container {
+        background-color: #fff0f6;
+        border-radius: 14px;
+        padding: 12px;
     }
 
+    /* Títulos */
+    h1, h2, h3, h4 {
+        color: #b30059;
+    }
+
+    /* Texto normal */
+    p, span, label {
+        color: #4d0026;
+    }
+
+    /* Botones */
     button {
-        background-color: #ff4da6 !important;
+        background-color: #ff66b2 !important;
         color: white !important;
-        border-radius: 12px;
+        border-radius: 10px !important;
+        border: none !important;
+    }
+
+    button:hover {
+        background-color: #e60073 !important;
+        color: white !important;
     }
     </style>
     """,
@@ -655,5 +681,6 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
