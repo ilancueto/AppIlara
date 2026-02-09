@@ -243,8 +243,9 @@ st.markdown(
             padding-right: 1rem;
         }
     }
-    /* =========================
-   DATAFRAME CLARO (FIX)
+    
+/* =========================
+   DATAFRAME CLARO (FIX v3.3.1)
    ========================= */
 
 div[data-testid="stDataFrame"] {
@@ -253,7 +254,6 @@ div[data-testid="stDataFrame"] {
     overflow: hidden !important;
 }
 
-/* Header */
 div[data-testid="stDataFrame"] thead tr {
     background-color: #ffe0eb !important;
 }
@@ -264,21 +264,19 @@ div[data-testid="stDataFrame"] thead th {
     border-bottom: 1px solid #ff99cc !important;
 }
 
-/* Filas */
 div[data-testid="stDataFrame"] tbody tr {
     background-color: rgba(255,255,255,0.85) !important;
 }
 
-/* Zebra */
 div[data-testid="stDataFrame"] tbody tr:nth-child(even) {
     background-color: rgba(255,240,246,0.85) !important;
 }
 
-/* Hover */
 div[data-testid="stDataFrame"] tbody tr:hover {
     background-color: #ffb6c1 !important;
 }
-    </style>
+
+</style>
     """,
     unsafe_allow_html=True
 )
@@ -397,7 +395,40 @@ st.markdown(
         z-index: 999;
         pointer-events: none;
     }
-    </style>
+    
+/* =========================
+   DATAFRAME CLARO (FIX v3.3.1)
+   ========================= */
+
+div[data-testid="stDataFrame"] {
+    background-color: rgba(255,255,255,0.65) !important;
+    border-radius: 16px !important;
+    overflow: hidden !important;
+}
+
+div[data-testid="stDataFrame"] thead tr {
+    background-color: #ffe0eb !important;
+}
+
+div[data-testid="stDataFrame"] thead th {
+    color: #660033 !important;
+    font-weight: 700 !important;
+    border-bottom: 1px solid #ff99cc !important;
+}
+
+div[data-testid="stDataFrame"] tbody tr {
+    background-color: rgba(255,255,255,0.85) !important;
+}
+
+div[data-testid="stDataFrame"] tbody tr:nth-child(even) {
+    background-color: rgba(255,240,246,0.85) !important;
+}
+
+div[data-testid="stDataFrame"] tbody tr:hover {
+    background-color: #ffb6c1 !important;
+}
+
+</style>
     <div class="footer-fixed">by Ilan con amor · v3.3.0</div>
     """,
     unsafe_allow_html=True
@@ -1131,4 +1162,3 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
-
