@@ -12,7 +12,7 @@ st.markdown(
     """
     <style>
     /* =========================
-       BASE (tu estilo)
+       BASE (Ilara Beauty)
        ========================= */
 
     /* Fondo general */
@@ -25,7 +25,9 @@ st.markdown(
         color: #660033 !important;
     }
 
-    /* Botones (base) */
+    /* =========================
+       BOTONES
+       ========================= */
     button {
         background-color: #ffb6c1 !important;
         color: #b30059 !important;
@@ -37,7 +39,6 @@ st.markdown(
         box-shadow: 0 6px 18px rgba(0,0,0,0.10);
     }
 
-    /* Hover de botones (fix legible) */
     button:hover {
         background-color: #ffffff !important;
         color: #b30059 !important;
@@ -45,16 +46,24 @@ st.markdown(
         box-shadow: 0 10px 25px rgba(0,0,0,0.14);
     }
 
-    /* =========================
-       APP LOOK: cards / forms / expanders / métricas
-       ========================= */
+    /* Botón primario */
+    button[kind="primary"] {
+        background-color: #e60073 !important;
+        color: white !important;
+    }
 
-    /* Separación superior y contenedor */
+    button[kind="primary"]:hover {
+        background-color: #b8005a !important;
+        color: white !important;
+    }
+
+    /* =========================
+       CARDS / CONTENEDORES
+       ========================= */
     .block-container {
         padding-top: 1.8rem;
     }
 
-    /* “Cards” glass */
     div[data-testid="stMetric"],
     div[data-testid="stExpander"],
     div[data-testid="stForm"],
@@ -67,13 +76,12 @@ st.markdown(
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
     }
 
-    /* Dataframe más prolijo (bordes redondeados reales) */
     div[data-testid="stDataFrame"] {
         overflow: hidden;
     }
 
     /* =========================
-       TABS premium (barra superior)
+       TABS
        ========================= */
     div[data-testid="stTabs"] button {
         border-radius: 14px !important;
@@ -81,34 +89,63 @@ st.markdown(
         font-weight: 700 !important;
     }
 
-    /* Tab activo */
     div[data-testid="stTabs"] button[aria-selected="true"] {
         box-shadow: 0 10px 28px rgba(230,0,115,0.20) !important;
         transform: translateY(-1px);
     }
 
     /* =========================
-       Botón primario (Confirmar / Guardar)
+       SELECTBOX / DROPDOWN FIX
        ========================= */
-    button[kind="primary"] {
-        background-color: #e60073 !important;
-        color: white !important;
+
+    /* Caja del select */
+    div[data-testid="stSelectbox"] > div {
+        background-color: #ffffff !important;
+        border-radius: 12px !important;
+        border: 1px solid #ff66b2 !important;
     }
 
-    button[kind="primary"]:hover {
-        background-color: #b8005a !important;
-        color: white !important;
+    /* Texto seleccionado */
+    div[data-testid="stSelectbox"] * {
+        color: #660033 !important;
+    }
+
+    /* Menú desplegable */
+    div[data-testid="stSelectbox"] ul {
+        background-color: #fff0f6 !important;
+        border-radius: 12px !important;
+        border: 1px solid #ff99cc !important;
+    }
+
+    /* Opciones */
+    div[data-testid="stSelectbox"] li {
+        background-color: #fff0f6 !important;
+        color: #660033 !important;
+        padding: 10px 14px !important;
+    }
+
+    /* Hover opción */
+    div[data-testid="stSelectbox"] li:hover {
+        background-color: #ffb6c1 !important;
+        color: #660033 !important;
+    }
+
+    /* Opción seleccionada */
+    div[data-testid="stSelectbox"] li[aria-selected="true"] {
+        background-color: #ff99cc !important;
+        color: #660033 !important;
+        font-weight: 700 !important;
     }
 
     /* =========================
-       Ocultar header negro Streamlit (look “app”)
+       HEADER STREAMLIT (OCULTO)
        ========================= */
     header[data-testid="stHeader"] {
         display: none;
     }
 
     /* =========================
-       Mobile tweaks
+       MOBILE
        ========================= */
     @media (max-width: 768px) {
         button {
@@ -226,7 +263,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by ChadGpt e Ilan con amor · v3.0.3</div>
+    <div class="footer-fixed">by Ilan con amor · v3.1.0</div>
     """,
     unsafe_allow_html=True
 )
@@ -749,6 +786,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
