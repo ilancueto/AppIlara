@@ -23,7 +23,7 @@ st.markdown(
     div[data-testid="stExpander"],
     div[data-testid="stForm"],
     div.block-container {
-        background-color: #fff0f6;
+        background-color: #f77eaf;
         border-radius: 14px;
         padding: 12px;
     }
@@ -681,6 +681,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
