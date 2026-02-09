@@ -11,17 +11,20 @@ st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.markdown(
     """
     <style>
+    /* Fondo general */
     .stApp {
         background-color: #ffb6c1;
     }
 
+    /* Texto general */
     * {
         color: #660033 !important;
     }
 
-     button {
-        background-color: ##ffffff !important;
-        color: white !important;
+    /* Botones */
+    button {
+        background-color: #ffffff !important;
+        color: #b30059 !important;
         border-radius: 11px !important;
         border: none !important;
         padding: 10px 18px !important;
@@ -36,6 +39,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 
 TZ_AR = pytz.timezone("America/Argentina/Buenos_Aires")
@@ -664,6 +668,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
