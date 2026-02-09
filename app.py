@@ -32,7 +32,7 @@ st.markdown(
     }
 
     button:hover {
-        background-color: #e60073 !important;
+        background-color: #ffffff !important;
         color: white !important;
     }
     </style>
@@ -668,6 +668,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
