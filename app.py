@@ -95,46 +95,69 @@ st.markdown(
     }
 
     /* =========================
-       SELECTBOX / DROPDOWN FIX
+       SELECT / DROPDOWN (FIX REAL BaseWeb)
        ========================= */
 
-    /* Caja del select */
-    div[data-testid="stSelectbox"] > div {
+    /* Caja del select (control) */
+    div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         border-radius: 12px !important;
         border: 1px solid #ff66b2 !important;
     }
 
-    /* Texto seleccionado */
-    div[data-testid="stSelectbox"] * {
+    /* Texto dentro del select */
+    div[data-baseweb="select"] * {
         color: #660033 !important;
     }
 
-    /* Menú desplegable */
-    div[data-testid="stSelectbox"] ul {
+    /* Popover del dropdown */
+    div[data-baseweb="popover"] {
+        background-color: transparent !important;
+    }
+
+    /* Lista desplegable */
+    div[data-baseweb="popover"] ul {
         background-color: #fff0f6 !important;
-        border-radius: 12px !important;
         border: 1px solid #ff99cc !important;
+        border-radius: 12px !important;
+        padding: 6px !important;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.18) !important;
     }
 
     /* Opciones */
-    div[data-testid="stSelectbox"] li {
+    div[data-baseweb="popover"] li {
         background-color: #fff0f6 !important;
         color: #660033 !important;
-        padding: 10px 14px !important;
+        border-radius: 10px !important;
+        padding: 10px 12px !important;
     }
 
-    /* Hover opción */
-    div[data-testid="stSelectbox"] li:hover {
+    /* Hover */
+    div[data-baseweb="popover"] li:hover {
         background-color: #ffb6c1 !important;
         color: #660033 !important;
     }
 
-    /* Opción seleccionada */
-    div[data-testid="stSelectbox"] li[aria-selected="true"] {
+    /* Seleccionada */
+    div[data-baseweb="popover"] li[aria-selected="true"] {
         background-color: #ff99cc !important;
         color: #660033 !important;
         font-weight: 700 !important;
+    }
+
+    /* Martillazo extra por si algún tema oscuro se mete */
+    [role="listbox"] {
+        background-color: #fff0f6 !important;
+        border: 1px solid #ff99cc !important;
+        border-radius: 12px !important;
+    }
+
+    [role="option"] {
+        color: #660033 !important;
+    }
+
+    [role="option"]:hover {
+        background-color: #ffb6c1 !important;
     }
 
     /* =========================
@@ -786,6 +809,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
