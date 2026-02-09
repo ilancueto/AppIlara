@@ -30,17 +30,17 @@ st.markdown(
 
     /* Títulos */
     h1, h2, h3, h4 {
-        color: #b30059;
+        color: #000000;
     }
 
     /* Texto normal */
     p, span, label {
-        color: #4d0026;
+        color: #000000;
     }
 
     /* Botones */
     button {
-        background-color: #ff66b2 !important;
+        background-color: #e60073 !important;
         color: white !important;
         border-radius: 10px !important;
         border: none !important;
@@ -681,6 +681,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
