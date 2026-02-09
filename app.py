@@ -11,6 +11,9 @@ st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Poppins', sans-serif !important; }
+
     /* =========================
        BASE (Ilara Beauty)
        ========================= */
@@ -78,6 +81,16 @@ st.markdown(
 
     div[data-testid="stDataFrame"] {
         overflow: hidden;
+    }
+
+    /* =========================
+       DATAFRAME (zebra + hover)
+       ========================= */
+    div[data-testid="stDataFrame"] tbody tr:nth-child(even) {
+        background-color: rgba(255, 240, 246, 0.65) !important;
+    }
+    div[data-testid="stDataFrame"] tbody tr:hover {
+        background-color: rgba(255, 182, 193, 0.65) !important;
     }
 
     /* =========================
@@ -317,9 +330,8 @@ def cargar_finanzas():
 # =========================================================
 # UI HEADER + FOOTER
 # =========================================================
-st.title("💅 Ilara Beauty — Stock, Ventas y Finanzas")
 
-# Footer fijo
+# Footer fijo (premium)
 st.markdown(
     """
     <style>
@@ -331,22 +343,50 @@ st.markdown(
         padding: 8px 0;
         text-align: center;
         font-size: 12px;
-        opacity: 0.75;
+        opacity: 0.78;
         background: rgba(0,0,0,0.0);
         z-index: 999;
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.1.0</div>
+    <div class="footer-fixed">by Ilan con amor · v3.2.0</div>
     """,
     unsafe_allow_html=True
 )
 
 # =========================================================
-# DATA
+# DATA (con spinner)
 # =========================================================
-df_inv = cargar_inventario()
-df_fin = cargar_finanzas()
+with st.spinner("Cargando Ilara Beauty..."):
+    df_inv = cargar_inventario()
+    df_fin = cargar_finanzas()
+
+# Header marca (premium)
+stock_crit = 0
+if not df_inv.empty and "stock" in df_inv.columns:
+    try:
+        stock_crit = int((pd.to_numeric(df_inv["stock"], errors="coerce").fillna(0) <= 3).sum())
+    except Exception:
+        stock_crit = 0
+
+st.markdown(
+    f"""
+    <div style="
+      background: linear-gradient(90deg,#ff66b2,#ff99cc);
+      color:white;
+      padding:14px 18px;
+      border-radius:18px;
+      font-weight:700;
+      font-size:22px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.14);
+      margin-bottom: 12px;">
+    💄 Ilara Beauty
+    <span style="font-weight:400;font-size:14px;opacity:.92;">— Stock, Ventas y Finanzas</span>
+    <span style="float:right;font-weight:600;font-size:14px;opacity:.95;">⚠️ Stock bajo: {stock_crit}</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # Blindajes inventario
 if not df_inv.empty:
@@ -436,7 +476,32 @@ with tab1:
                 "ganancia": "Ganancia"
             }, inplace=True)
 
+            # Estado (chips)
+            def _estado_stock(s):
+                try:
+                    s = int(s)
+                except Exception:
+                    s = 0
+                if s <= 0:
+                    return "🛑 Agotado"
+                if s <= 3:
+                    return "⚠️ Bajo"
+                return "✅ OK"
+
+            view_show["Estado"] = view_show["Stock"].apply(_estado_stock)
+
             st.dataframe(view_show, use_container_width=True, hide_index=True)
+
+            # Export CSV
+            csv_inv = view_show.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Exportar inventario filtrado (CSV)",
+                csv_inv,
+                file_name="ilara_inventario.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
 
     # Agregar / reponer
     with sub_add:
@@ -613,70 +678,64 @@ with tab2:
             if stock_est <= 0:
                 st.error("❌ Producto agotado.")
             else:
-                a, b = st.columns(2)
+                with st.form(f"form_venta_{id_prod}", clear_on_submit=True):
+                    a, b = st.columns(2)
+                    cantidad = a.number_input(
+                        "Cantidad",
+                        min_value=1,
+                        max_value=max(1, stock_est),
+                        value=1,
+                        step=1,
+                    )
 
-                cantidad = a.number_input(
-                    "Cantidad",
-                    min_value=1,
-                    max_value=stock_est,
-                    value=1,
-                    step=1,
-                    key=f"cant_{id_prod}"
-                )
+                    total_calc = precio_unit * int(cantidad)
+                    b.metric("Total sugerido", formatear_monto_ars(total_calc))
 
-                total_calc = precio_unit * int(cantidad)
+                    editar_total = st.checkbox("Editar total (descuento/recargo)", value=False)
 
-                total_key = f"total_{id_prod}"
-                sug_key = f"sug_{id_prod}"
+                    if editar_total:
+                        total_cobrado = st.number_input(
+                            "Total a cobrar ($)",
+                            min_value=0.0,
+                            value=float(total_calc),
+                            step=100.0,
+                        )
+                    else:
+                        st.metric("Total a cobrar", formatear_monto_ars(total_calc))
+                        total_cobrado = float(total_calc)
 
-                if sug_key not in st.session_state:
-                    st.session_state[sug_key] = float(total_calc)
-                if total_key not in st.session_state:
-                    st.session_state[total_key] = float(total_calc)
+                    p1, p2 = st.columns(2)
+                    metodo = p1.selectbox(
+                        "Método de pago",
+                        ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"],
+                    )
+                    nota = p2.text_input("Cliente / Nota (opcional)", placeholder="Ej: María").strip()
 
-                # si cambia cantidad, arrastro el total SOLO si no lo editaron
-                if float(st.session_state[sug_key]) != float(total_calc):
-                    if float(st.session_state[total_key]) == float(st.session_state[sug_key]):
-                        st.session_state[total_key] = float(total_calc)
-                    st.session_state[sug_key] = float(total_calc)
+                    st.divider()
 
-                b.metric("Total sugerido", formatear_monto_ars(total_calc))
+                    submitted = st.form_submit_button(
+                        "✅ Confirmar venta",
+                        type="primary",
+                        use_container_width=True,
+                    )
 
-                # callback seguro (evita StreamlitAPIException)
-                def usar_sugerido():
-                    st.session_state[total_key] = float(total_calc)
-                    st.session_state[sug_key] = float(total_calc)
-
-                st.button("Usar total sugerido", key=f"use_sug_{id_prod}", on_click=usar_sugerido)
-
-                total_cobrado = st.number_input(
-                    "Total a cobrar ($)",
-                    min_value=0.0,
-                    value=float(st.session_state[total_key]),
-                    step=100.0,
-                    key=total_key
-                )
-
-                p1, p2 = st.columns(2)
-                metodo = p1.selectbox("Método de pago", ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"])
-                nota = p2.text_input("Cliente / Nota (opcional)", placeholder="Ej: María").strip()
-
-                st.divider()
-
-                if st.button("✅ Confirmar venta", use_container_width=True):
+                if submitted:
                     desc = f"Venta: {int(cantidad)}x {row['producto']} ({row['marca']}) | Pago: {metodo}"
                     if nota:
                         desc += f" | Nota: {nota}"
 
-                    # 1) RPC (real)
+                    # 1) RPC (ideal)
                     try:
-                        supabase.rpc("registrar_venta", {
-                            "p_producto_id": id_prod,
-                            "p_cantidad": int(cantidad),
-                            "p_monto": float(total_cobrado),
-                            "p_descripcion": desc,
-                            "p_metodo_pago": metodo
-                        }).execute()
+                        supabase.rpc(
+                            "registrar_venta",
+                            {
+                                "p_producto_id": id_prod,
+                                "p_cantidad": int(cantidad),
+                                "p_monto": float(total_cobrado),
+                                "p_descripcion": desc,
+                                "p_metodo_pago": metodo,
+                            },
+                        ).execute()
 
                         st.toast("💰 Venta registrada!", icon="✅")
                         limpiar_cache()
@@ -685,23 +744,35 @@ with tab2:
                     except Exception:
                         # 2) fallback (sin RPC)
                         try:
-                            check = supabase.table("inventario").select("stock").eq("id", id_prod).single().execute()
+                            check = (
+                                supabase.table("inventario")
+                                .select("stock")
+                                .eq("id", id_prod)
+                                .single()
+                                .execute()
+                            )
                             stock_real = int(check.data.get("stock", 0))
 
                             if stock_real < int(cantidad):
-                                st.error(f"❌ No seo se pudo registrar la venta: Stock insuficiente (real: {stock_real}).")
+                                st.error(
+                                    f"❌ No se pudo registrar la venta: Stock insuficiente (real: {stock_real})."
+                                )
                             else:
-                                supabase.table("inventario").update({"stock": stock_real - int(cantidad)}).eq("id", id_prod).execute()
+                                supabase.table("inventario").update(
+                                    {"stock": stock_real - int(cantidad)}
+                                ).eq("id", id_prod).execute()
 
-                                supa_base = supabase.table("finanzas").insert({
-                                    "fecha": now_ar_str(),
-                                    "tipo": "Ingreso",
-                                    "descripcion": desc,
-                                    "monto": float(total_cobrado),
-                                    "producto_id": id_prod,
-                                    "cantidad": int(cantidad),
-                                    "metodo_pago": metodo
-                                }).execute()
+                                supabase.table("finanzas").insert(
+                                    {
+                                        "fecha": now_ar_str(),
+                                        "tipo": "Ingreso",
+                                        "descripcion": desc,
+                                        "monto": float(total_cobrado),
+                                        "producto_id": id_prod,
+                                        "cantidad": int(cantidad),
+                                        "metodo_pago": metodo,
+                                    }
+                                ).execute()
 
                                 st.toast("💰 Venta registrada (fallback).", icon="✅")
                                 limpiar_cache()
@@ -709,9 +780,6 @@ with tab2:
                         except Exception as e2:
                             st.error(f"Error: {e2}")
 
-# =========================================================
-# TAB 3: GASTO
-# =========================================================
 with tab3:
     st.header("💸 Registrar Gasto")
 
@@ -840,6 +908,17 @@ with tab4:
         tabla.columns = ["Fecha", "Tipo", "Descripción", "Monto"]
 
         st.dataframe(tabla, use_container_width=True, hide_index=True)
+
+        # Export CSV
+        csv_fin = tabla.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Exportar finanzas (CSV)",
+            csv_fin,
+            file_name="ilara_finanzas.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
     else:
         st.info("No hay movimientos para mostrar.")
 
@@ -860,19 +939,3 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
