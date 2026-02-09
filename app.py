@@ -11,6 +11,10 @@ st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.markdown(
     """
     <style>
+    /* =========================
+       BASE (tu estilo)
+       ========================= */
+
     /* Fondo general */
     .stApp {
         background-color: #ffb6c1;
@@ -21,7 +25,7 @@ st.markdown(
         color: #660033 !important;
     }
 
-    /* Botones */
+    /* Botones (base) */
     button {
         background-color: #ffb6c1 !important;
         color: #b30059 !important;
@@ -29,19 +33,96 @@ st.markdown(
         border: none !important;
         padding: 10px 18px !important;
         font-weight: 600 !important;
+        transition: all .15s ease-in-out !important;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.10);
     }
 
+    /* Hover de botones (fix legible) */
     button:hover {
         background-color: #ffffff !important;
+        color: #b30059 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.14);
+    }
+
+    /* =========================
+       APP LOOK: cards / forms / expanders / métricas
+       ========================= */
+
+    /* Separación superior y contenedor */
+    .block-container {
+        padding-top: 1.8rem;
+    }
+
+    /* “Cards” glass */
+    div[data-testid="stMetric"],
+    div[data-testid="stExpander"],
+    div[data-testid="stForm"],
+    div[data-testid="stDataFrame"] {
+        background: rgba(255,255,255,0.55);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.65);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    /* Dataframe más prolijo (bordes redondeados reales) */
+    div[data-testid="stDataFrame"] {
+        overflow: hidden;
+    }
+
+    /* =========================
+       TABS premium (barra superior)
+       ========================= */
+    div[data-testid="stTabs"] button {
+        border-radius: 14px !important;
+        padding: 10px 18px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Tab activo */
+    div[data-testid="stTabs"] button[aria-selected="true"] {
+        box-shadow: 0 10px 28px rgba(230,0,115,0.20) !important;
+        transform: translateY(-1px);
+    }
+
+    /* =========================
+       Botón primario (Confirmar / Guardar)
+       ========================= */
+    button[kind="primary"] {
+        background-color: #e60073 !important;
         color: white !important;
+    }
+
+    button[kind="primary"]:hover {
+        background-color: #b8005a !important;
+        color: white !important;
+    }
+
+    /* =========================
+       Ocultar header negro Streamlit (look “app”)
+       ========================= */
+    header[data-testid="stHeader"] {
+        display: none;
+    }
+
+    /* =========================
+       Mobile tweaks
+       ========================= */
+    @media (max-width: 768px) {
+        button {
+            width: 100% !important;
+        }
+        .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
     }
     </style>
     """,
     unsafe_allow_html=True
 )
-
-
-
 TZ_AR = pytz.timezone("America/Argentina/Buenos_Aires")
 
 # =========================================================
@@ -668,6 +749,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
