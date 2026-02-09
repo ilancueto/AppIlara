@@ -11,49 +11,23 @@ st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.markdown(
     """
     <style>
-    /* Fondo general */
     .stApp {
-        background-color: #f77eaf;
+        background-color: #ffb6c1;
     }
 
-    /* Contenedores (cards, métricas, dataframes) */
-    div[data-testid="stMetric"],
-    div[data-testid="stDataFrame"],
-    section[data-testid="stSidebar"],
-    div[data-testid="stExpander"],
-    div[data-testid="stForm"],
-    div.block-container {
-        background-color: #f77eaf;
-        border-radius: 14px;
-        padding: 12px;
+    * {
+        color: #660033 !important;
     }
 
-    /* Títulos */
-    h1, h2, h3, h4 {
-        color: #000000;
-    }
-
-    /* Texto normal */
-    p, span, label {
-        color: #000000;
-    }
-
-    /* Botones */
     button {
-        background-color: #e60073 !important;
-        color: white !important;
-        border-radius: 10px !important;
-        border: none !important;
-    }
-
-    button:hover {
-        background-color: #e60073 !important;
+        background-color: #ff1493 !important;
         color: white !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 
 TZ_AR = pytz.timezone("America/Argentina/Buenos_Aires")
 
@@ -681,6 +655,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
