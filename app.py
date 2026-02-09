@@ -95,7 +95,58 @@ st.markdown(
     }
 
     /* =========================
-       SELECT / DROPDOWN (FIX REAL BaseWeb)
+       INPUTS / TEXTBOX / NUMBER INPUT (BaseWeb) ✅ FIX
+       ========================= */
+
+    /* Contenedor de inputs */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="textarea"] > div {
+        background-color: #ffffff !important;
+        border-radius: 12px !important;
+        border: 1px solid #ff66b2 !important;
+        box-shadow: none !important;
+    }
+
+    /* El input real (texto dentro) */
+    div[data-baseweb="input"] input,
+    div[data-baseweb="textarea"] textarea {
+        background-color: transparent !important;
+        color: #660033 !important;
+        caret-color: #e60073 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Placeholder */
+    div[data-baseweb="input"] input::placeholder,
+    div[data-baseweb="textarea"] textarea::placeholder {
+        color: rgba(102,0,51,0.55) !important;
+    }
+
+    /* Focus glow */
+    div[data-baseweb="input"] > div:focus-within,
+    div[data-baseweb="textarea"] > div:focus-within,
+    div[data-baseweb="select"] > div:focus-within {
+        border: 2px solid #e60073 !important;
+        box-shadow: 0 0 0 4px rgba(230,0,115,0.18) !important;
+    }
+
+    /* Botoncitos + / - (number_input) */
+    div[data-baseweb="input"] button {
+        background-color: #ffb6c1 !important;
+        color: #660033 !important;
+        box-shadow: none !important;
+        border-radius: 10px !important;
+        padding: 6px 10px !important;
+    }
+
+    div[data-baseweb="input"] button:hover {
+        background-color: #ff99cc !important;
+        color: #660033 !important;
+        transform: none !important;
+    }
+
+    /* =========================
+       SELECT / DROPDOWN (BaseWeb) ✅
        ========================= */
 
     /* Caja del select (control) */
@@ -809,6 +860,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
