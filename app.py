@@ -249,6 +249,11 @@ st.markdown(
 )
 TZ_AR = pytz.timezone("America/Argentina/Buenos_Aires")
 
+
+# =========================================================
+# CONSTANTES
+# =========================================================
+DEFAULT_CATEGORIAS = ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"]
 # =========================================================
 # CONEXIÓN SUPABASE (cacheada)
 # =========================================================
@@ -327,6 +332,15 @@ def cargar_finanzas():
     except:
         return pd.DataFrame()
 
+
+@st.cache_data(ttl=60)
+def cargar_categorias():
+    try:
+        res = supabase.table("categorias").select("*").order("nombre").execute()
+        return pd.DataFrame(res.data)
+    except:
+        return pd.DataFrame()
+
 # =========================================================
 # UI HEADER + FOOTER
 # =========================================================
@@ -349,7 +363,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.2.0</div>
+    <div class="footer-fixed">by Ilan con amor · v3.3.0</div>
     """,
     unsafe_allow_html=True
 )
@@ -360,8 +374,28 @@ st.markdown(
 with st.spinner("Cargando Ilara Beauty..."):
     df_inv = cargar_inventario()
     df_fin = cargar_finanzas()
+    df_cats = cargar_categorias()
 
 # Header marca (premium)
+
+# =========================================================
+# CATEGORÍAS (dinámicas desde Supabase)
+# =========================================================
+if "df_cats" not in locals() or df_cats is None:
+    df_cats = pd.DataFrame()
+
+if not df_cats.empty:
+    df_cats["id"] = pd.to_numeric(df_cats.get("id", None), errors="coerce")
+    df_cats["nombre"] = df_cats.get("nombre", "").astype(str).str.strip()
+    df_cats = df_cats.dropna(subset=["id"]).copy()
+    df_cats["id"] = df_cats["id"].astype(int)
+    df_cats = df_cats[df_cats["nombre"] != ""].copy()
+
+cat_name_to_id = {r["nombre"]: int(r["id"]) for _, r in df_cats.iterrows()} if not df_cats.empty else {}
+cat_id_to_name = {int(r["id"]): r["nombre"] for _, r in df_cats.iterrows()} if not df_cats.empty else {}
+
+categorias_list = sorted(cat_name_to_id.keys()) if cat_name_to_id else DEFAULT_CATEGORIAS
+
 stock_crit = 0
 if not df_inv.empty and "stock" in df_inv.columns:
     try:
@@ -390,10 +424,24 @@ st.markdown(
 
 # Blindajes inventario
 if not df_inv.empty:
-    for col in ["producto", "marca", "categoria"]:
+    # columnas base
+    for col in ["producto", "marca"]:
         if col not in df_inv.columns:
             df_inv[col] = ""
         df_inv[col] = df_inv[col].astype(str)
+
+    # categoria_id (si existe)
+    if "categoria_id" in df_inv.columns:
+        df_inv["categoria_id"] = pd.to_numeric(df_inv["categoria_id"], errors="coerce")
+
+    # categoria "nombre" (compat: si todavía existe texto en inventario)
+    if "categoria" not in df_inv.columns:
+        df_inv["categoria"] = ""
+    df_inv["categoria"] = df_inv["categoria"].astype(str)
+
+    # Si hay categoria_id, usamos el nombre de la tabla categorias
+    if "categoria_id" in df_inv.columns and cat_id_to_name:
+        df_inv["categoria"] = df_inv["categoria_id"].apply(lambda x: cat_id_to_name.get(int(x), "") if pd.notna(x) else "")                               .where(lambda s: s.astype(str).str.len() > 0, df_inv["categoria"])
 
     df_inv["display"] = df_inv["producto"] + " - " + df_inv["marca"]
 
@@ -403,6 +451,7 @@ if not df_inv.empty:
 
     # key local robusta (para duplicados)
     df_inv["key"] = df_inv["producto"].str.strip().str.lower() + "_" + df_inv["marca"].str.strip().str.lower()
+
 
 # Blindajes finanzas
 if not df_fin.empty:
@@ -418,10 +467,9 @@ if not df_fin.empty:
 # =========================================================
 # TABS (tradicional)
 # =========================================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "💌 About"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["📦 Inventario", "💰 Nueva Venta", "💸 Nuevo Gasto", "📊 Finanzas", "🏷️ Categorías", "💌 About"]
 )
-
 # =========================================================
 # TAB 1: INVENTARIO
 # =========================================================
@@ -512,7 +560,7 @@ with tab1:
             marca = b.text_input("Marca").strip()
             marca_final = marca if marca else "Genérico"
 
-            cat = a.selectbox("Categoría", ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"])
+            cat = a.selectbox("Categoría", categorias_list)
             cant = b.number_input("Cantidad", min_value=1, value=1, step=1)
 
             costo = a.number_input("Costo ($)", min_value=0.0, value=None, placeholder="0,00")
@@ -533,7 +581,8 @@ with tab1:
                                 "stock": new_stock,
                                 "precio_costo": float(costo),
                                 "precio_venta": float(venta),
-                                "categoria": cat
+                                "categoria": cat,
+                                "categoria_id": int(cat_name_to_id.get(cat, 0)) if cat_name_to_id.get(cat) else None
                             }).eq("id", int(prod["id"])).execute()
                             st.toast(f"🔄 Stock actualizado: {prod['stock']} ➝ {new_stock}", icon="✅")
                         else:
@@ -541,6 +590,7 @@ with tab1:
                                 "producto": nom,
                                 "marca": marca_final,
                                 "categoria": cat,
+                                "categoria_id": int(cat_name_to_id.get(cat, 0)) if cat_name_to_id.get(cat) else None,
                                 "stock": int(cant),
                                 "precio_costo": float(costo),
                                 "precio_venta": float(venta)
@@ -565,7 +615,7 @@ with tab1:
                 new_nom = a.text_input("Nombre", value=row["producto"]).strip()
                 new_marca = b.text_input("Marca", value=row["marca"]).strip()
 
-                cats = ["Labios", "Ojos", "Rostro", "Skincare", "Accesorios"]
+                cats = categorias_list
                 idx = cats.index(row["categoria"]) if row["categoria"] in cats else 0
                 new_cat = a.selectbox("Categoría", cats, index=idx)
 
@@ -584,6 +634,7 @@ with tab1:
                                 "producto": new_nom,
                                 "marca": new_marca,
                                 "categoria": new_cat,
+                                "categoria_id": int(cat_name_to_id.get(new_cat, 0)) if cat_name_to_id.get(new_cat) else None,
                                 "precio_costo": float(new_costo),
                                 "precio_venta": float(new_venta)
                             }).eq("id", id_actual).execute()
@@ -923,9 +974,115 @@ with tab4:
         st.info("No hay movimientos para mostrar.")
 
 # =========================================================
-# TAB 5: ABOUT
+
+# =========================================================
+# TAB 5: CATEGORÍAS (ABM)
 # =========================================================
 with tab5:
+    st.header("🏷️ Categorías")
+
+    st.caption("Administrá las categorías desde acá. Se usan en Inventario (Agregar/Editar).")
+
+    # refrescar dataframe desde cache
+    df_cats_view = cargar_categorias()
+
+    if df_cats_view.empty:
+        st.warning("No hay categorías cargadas. Agregá la primera.")
+    else:
+        show_c = df_cats_view.copy()
+        if "id" in show_c.columns:
+            show_c["id"] = pd.to_numeric(show_c["id"], errors="coerce")
+        if "nombre" in show_c.columns:
+            show_c["nombre"] = show_c["nombre"].astype(str)
+        show_c = show_c.rename(columns={"id":"ID","nombre":"Categoría"})
+        cols = [c for c in ["ID","Categoría"] if c in show_c.columns]
+        st.dataframe(show_c[cols], use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    c_add, c_ren, c_del = st.tabs(["➕ Agregar", "✏️ Renombrar", "🗑️ Eliminar"])
+
+    with c_add:
+        with st.form("form_cat_add"):
+            nombre = st.text_input("Nueva categoría", placeholder="Ej: Uñas").strip()
+            if st.form_submit_button("Guardar", type="primary"):
+                if not nombre:
+                    st.error("⚠️ Escribí un nombre.")
+                else:
+                    try:
+                        supabase.table("categorias").insert({"nombre": nombre}).execute()
+                        st.toast("✅ Categoría agregada.", icon="✅")
+                        limpiar_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+    with c_ren:
+        df_cats_view = cargar_categorias()
+        nombres = df_cats_view["nombre"].astype(str).tolist() if (not df_cats_view.empty and "nombre" in df_cats_view.columns) else []
+        if not nombres:
+            st.info("Agregá categorías primero.")
+        else:
+            old = st.selectbox("Categoría a renombrar", nombres, key="cat_ren_old")
+            with st.form("form_cat_ren"):
+                new_name = st.text_input("Nuevo nombre", value=old).strip()
+                if st.form_submit_button("Renombrar", type="primary"):
+                    if not new_name:
+                        st.error("⚠️ Nombre inválido.")
+                    else:
+                        try:
+                            row = df_cats_view[df_cats_view["nombre"].astype(str) == old].iloc[0]
+                            cat_id = int(row["id"])
+                            supabase.table("categorias").update({"nombre": new_name}).eq("id", cat_id).execute()
+
+                            # compat: si inventario aún guarda texto en 'categoria', lo mantenemos sincronizado
+                            try:
+                                supabase.table("inventario").update({"categoria": new_name}).eq("categoria_id", cat_id).execute()
+                            except Exception:
+                                pass
+
+                            st.toast("✏️ Categoría renombrada.", icon="✅")
+                            limpiar_cache()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+    with c_del:
+        df_cats_view = cargar_categorias()
+        nombres = df_cats_view["nombre"].astype(str).tolist() if (not df_cats_view.empty and "nombre" in df_cats_view.columns) else []
+        if not nombres:
+            st.info("Agregá categorías primero.")
+        else:
+            sel_name = st.selectbox("Categoría a eliminar", nombres, key="cat_del_sel")
+            ok = st.checkbox("Confirmo eliminar esta categoría", key="cat_del_ok")
+
+            # buscamos id
+            row = df_cats_view[df_cats_view["nombre"].astype(str) == sel_name].iloc[0]
+            cat_id = int(row["id"])
+
+            # chequeo de uso (no borrar si está en inventario)
+            try:
+                used = supabase.table("inventario").select("id").eq("categoria_id", cat_id).execute()
+                used_count = len(used.data or [])
+            except Exception:
+                used_count = 0
+
+            if used_count > 0:
+                st.warning(f"⚠️ No se puede borrar: está en uso por {used_count} producto(s). Renombrala o reasigná esos productos.")
+                st.button("Eliminar", disabled=True, use_container_width=True)
+            else:
+                if st.button("Eliminar", type="primary", disabled=not ok, use_container_width=True):
+                    try:
+                        supabase.table("categorias").delete().eq("id", cat_id).execute()
+                        st.toast("🗑️ Categoría eliminada.", icon="✅")
+                        limpiar_cache()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+
+# TAB 6: ABOUT
+# =========================================================
+with tab6:
     st.header("💌 About")
     st.write("Esta app está hecha para ordenar stock, ventas y gastos de **Ilara Beauty**.")
     st.divider()
