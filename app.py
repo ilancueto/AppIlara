@@ -24,6 +24,8 @@ st.markdown(
         color: white !important;
         border-radius: 11px !important;
         border: none !important;
+        padding: 10px 18px !important;
+        font-weight: 600 !important;
     }
 
     button:hover {
@@ -662,6 +664,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
