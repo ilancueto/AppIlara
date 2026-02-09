@@ -19,8 +19,15 @@ st.markdown(
         color: #660033 !important;
     }
 
-    button {
-        background-color: #ff1493 !important;
+     button {
+        background-color: #e60073 !important;
+        color: white !important;
+        border-radius: 10px !important;
+        border: none !important;
+    }
+
+    button:hover {
+        background-color: #e60073 !important;
         color: white !important;
     }
     </style>
@@ -655,6 +662,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
