@@ -23,7 +23,7 @@ st.markdown(
 
     /* Botones */
     button {
-        background-color: #ffffff !important;
+        background-color: #ffb6c1 !important;
         color: #b30059 !important;
         border-radius: 11px !important;
         border: none !important;
@@ -668,6 +668,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
