@@ -25,7 +25,7 @@ st.markdown(
 
     /* Texto general */
     * {
-        color: #660033 !important;
+        color: #ffffff !important;
     }
 
     /* =========================
@@ -1156,3 +1156,4 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
