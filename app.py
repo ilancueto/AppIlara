@@ -375,7 +375,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.6.0</div>
+    <div class="footer-fixed">by Ilan con amor · v3.6.1</div>
     """,
     unsafe_allow_html=True
 )
@@ -726,7 +726,7 @@ with tab1:
 with tab2:
     st.header("💰 Registrar Venta (Carrito)")
 
-    # ===== CARRITO DE VENTAS (v3.6.0) =====
+    # ===== CARRITO DE VENTAS (v3.6.1) =====
     if "carrito" not in st.session_state:
         st.session_state["carrito"] = []
 
@@ -1033,33 +1033,42 @@ with tab4:
     else:
         st.info("No hay movimientos para mostrar.")
 
-st.subheader("➕ Ingreso manual")
-
-with st.form("form_ingreso_manual", clear_on_submit=True):
-    monto = st.number_input("Monto ($)", min_value=0.0, step=100.0)
-    desc = st.text_input("Descripción", placeholder="Regalo, aporte personal, etc.")
-
-    ok = st.form_submit_button("Agregar ingreso")
-
-if ok:
-    if monto <= 0:
-        st.error("El monto debe ser mayor a 0")
-    else:
-        supabase.table("finanzas").insert({
-            "tipo": "Ingreso",
-            "monto": float(monto),
-            "descripcion": desc or "Ingreso manual",
-            "fecha": now_ar_str()
-        }).execute()
-
-        st.toast("💰 Ingreso agregado correctamente", icon="🎁")
-        st.rerun()
-
 # =========================================================
 
 # =========================================================
 # TAB 5: CATEGORÍAS (ABM)
 # =========================================================
+    st.subheader("➕ Ingreso manual")
+
+    with st.form("form_ingreso_manual", clear_on_submit=True):
+        desc_in = st.text_input("Descripción", placeholder="Ej: Regalo / Aporte personal").strip()
+        monto_in = st.number_input("Monto ($)", min_value=0.0, value=0.0, step=100.0)
+
+        ok_in = st.form_submit_button("Agregar ingreso")
+
+    if ok_in:
+        if float(monto_in) <= 0:
+            st.error("⚠️ Poné un monto mayor a 0.")
+        else:
+            try:
+                supabase.table("finanzas").insert({
+                    "fecha": now_ar_str(),
+                    "tipo": "Ingreso",
+                    "descripcion": desc_in or "Ingreso manual",
+                    "monto": float(monto_in)  # ✅ positivo
+                }).execute()
+
+                # ✅ toast que sobrevive al rerun (usa tu helper)
+                try:
+                    queue_toast("💰 Ingreso agregado correctamente", icon="🎁")
+                except Exception:
+                    st.toast("💰 Ingreso agregado correctamente", icon="🎁")
+
+                limpiar_cache()
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error al agregar ingreso: {e}")
+
 with tab5:
     st.header("🏷️ Categorías")
 
