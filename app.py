@@ -363,7 +363,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.3.0</div>
+    <div class="footer-fixed">by Ilan con amor · v3.5.0</div>
     """,
     unsafe_allow_html=True
 )
@@ -708,13 +708,22 @@ with tab1:
 # TAB 2: VENTA (FIX total sugerido + callback)
 # =========================================================
 with tab2:
-    st.header("💰 Registrar Venta")
+    st.header("💰 Registrar Venta (Carrito)")
+
+    # ===== CARRITO DE VENTAS (v3.5.0) =====
+    if "carrito" not in st.session_state:
+        st.session_state["carrito"] = []
+
+    carrito = st.session_state["carrito"]
 
     if df_inv.empty:
         st.warning("Primero cargá productos en Inventario.")
     else:
+        # --------- Agregar al carrito ---------
+        st.subheader("➕ Agregar productos")
+
         opciones = df_inv["display"].unique()
-        sel = st.selectbox("Producto a vender", opciones)
+        sel = st.selectbox("Producto", opciones, key="cart_sel_prod")
 
         if sel:
             row = df_inv[df_inv["display"] == sel].iloc[0]
@@ -722,114 +731,149 @@ with tab2:
             stock_est = int(row["stock"])
             precio_unit = float(row["precio_venta"])
 
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             c1.metric("Precio Unitario", formatear_monto_ars(precio_unit))
             c2.metric("Stock (estimado)", f"{stock_est} u.")
+            c3.metric("En carrito", str(sum(int(i["cantidad"]) for i in carrito if int(i["producto_id"]) == id_prod)))
 
             if stock_est <= 0:
                 st.error("❌ Producto agotado.")
             else:
-                with st.form(f"form_venta_{id_prod}", clear_on_submit=True):
-                    a, b = st.columns(2)
-                    cantidad = a.number_input(
-                        "Cantidad",
-                        min_value=1,
-                        max_value=max(1, stock_est),
-                        value=1,
-                        step=1,
+                a, b = st.columns(2)
+                cant = a.number_input(
+                    "Cantidad",
+                    min_value=1,
+                    max_value=max(1, stock_est),
+                    value=1,
+                    step=1,
+                    key=f"cart_cant_{id_prod}",
+                )
+
+                subtotal_calc = float(precio_unit) * int(cant)
+                b.metric("Subtotal sugerido", formatear_monto_ars(subtotal_calc))
+
+                editar_subtotal = st.checkbox("Editar subtotal (descuento/recargo)", value=False, key=f"cart_edit_sub_{id_prod}")
+                if editar_subtotal:
+                    subtotal = st.number_input(
+                        "Subtotal final ($)",
+                        min_value=0.0,
+                        value=float(subtotal_calc),
+                        step=100.0,
+                        key=f"cart_subtotal_{id_prod}",
                     )
+                else:
+                    subtotal = float(subtotal_calc)
 
-                    total_calc = precio_unit * int(cantidad)
-                    b.metric("Total sugerido", formatear_monto_ars(total_calc))
+                add_col1, add_col2 = st.columns([2, 1])
+                if add_col1.button("➕ Agregar al carrito", type="primary", use_container_width=True):
+                    # si ya está, sumamos cantidad y subtotal
+                    found = False
+                    for it in carrito:
+                        if int(it["producto_id"]) == id_prod:
+                            it["cantidad"] = int(it["cantidad"]) + int(cant)
+                            it["subtotal"] = float(it.get("subtotal", 0.0)) + float(subtotal)
+                            it["precio_unit"] = float(precio_unit)  # por las dudas
+                            it["display"] = sel
+                            found = True
+                            break
+                    if not found:
+                        carrito.append({
+                            "producto_id": id_prod,
+                            "display": sel,
+                            "cantidad": int(cant),
+                            "precio_unit": float(precio_unit),
+                            "subtotal": float(subtotal),
+                        })
+                    st.session_state["carrito"] = carrito
+                    st.toast("🛒 Agregado al carrito.", icon="✅")
+                    st.rerun()
 
-                    editar_total = st.checkbox("Editar total (descuento/recargo)", value=False)
+                if add_col2.button("🗑️ Vaciar", use_container_width=True, disabled=(len(carrito) == 0)):
+                    st.session_state["carrito"] = []
+                    st.toast("Carrito vaciado.", icon="🗑️")
+                    st.rerun()
 
-                    if editar_total:
-                        total_cobrado = st.number_input(
-                            "Total a cobrar ($)",
-                            min_value=0.0,
-                            value=float(total_calc),
-                            step=100.0,
-                        )
-                    else:
-                        st.metric("Total a cobrar", formatear_monto_ars(total_calc))
-                        total_cobrado = float(total_calc)
+        st.divider()
 
-                    p1, p2 = st.columns(2)
-                    metodo = p1.selectbox(
-                        "Método de pago",
-                        ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"],
-                    )
-                    nota = p2.text_input("Cliente / Nota (opcional)", placeholder="Ej: María").strip()
+        # --------- Mostrar carrito ---------
+        st.subheader("🛒 Carrito")
 
-                    st.divider()
+        if not carrito:
+            st.info("Carrito vacío. Agregá productos arriba.")
+        else:
+            df_cart = pd.DataFrame(carrito)
+            df_cart["Precio"] = df_cart["precio_unit"].apply(formatear_monto_ars)
+            df_cart["Subtotal"] = df_cart["subtotal"].apply(formatear_monto_ars)
+            df_cart_show = df_cart[["display", "cantidad", "Precio", "Subtotal"]].copy()
+            df_cart_show.columns = ["Producto", "Cantidad", "Precio Unit.", "Subtotal"]
 
-                    submitted = st.form_submit_button(
-                        "✅ Confirmar venta",
-                        type="primary",
-                        use_container_width=True,
-                    )
+            st.dataframe(df_cart_show, use_container_width=True, hide_index=True)
 
-                if submitted:
-                    desc = f"Venta: {int(cantidad)}x {row['producto']} ({row['marca']}) | Pago: {metodo}"
+            total_sugerido = float(sum(float(i.get("subtotal", 0.0)) for i in carrito))
+
+            c1, c2 = st.columns([2, 1])
+            c1.metric("Total sugerido", formatear_monto_ars(total_sugerido))
+
+            editar_total = st.checkbox("Editar total final", value=False, key="cart_edit_total")
+            if editar_total:
+                total_final = st.number_input(
+                    "Total final a cobrar ($)",
+                    min_value=0.0,
+                    value=float(total_sugerido),
+                    step=100.0,
+                    key="cart_total_final",
+                )
+            else:
+                total_final = float(total_sugerido)
+
+            st.divider()
+
+            p1, p2 = st.columns(2)
+            metodo_pago = p1.selectbox("Método de pago", ["Efectivo", "Transferencia", "Cuenta Corriente", "Otro"], key="cart_metodo")
+            nota = p2.text_input("Cliente / Nota (opcional)", placeholder="Ej: María", key="cart_nota").strip()
+
+            # Quitar item
+            rm1, rm2 = st.columns([3, 1])
+            opciones_rm = [f'{it["display"]} (x{it["cantidad"]})' for it in carrito]
+            sel_rm = rm1.selectbox("Quitar ítem", opciones_rm, key="cart_rm_sel")
+            if rm2.button("Quitar", use_container_width=True):
+                idx = opciones_rm.index(sel_rm)
+                carrito.pop(idx)
+                st.session_state["carrito"] = carrito
+                st.rerun()
+
+            st.divider()
+
+            # --------- Procesar venta (RPC) ---------
+            if st.button("✅ Procesar venta (carrito)", type="primary", use_container_width=True):
+                try:
+                    # armado payload RPC
+                    items_rpc = [{"producto_id": int(i["producto_id"]), "cantidad": int(i["cantidad"])} for i in carrito]
+
+                    # descripción corta y útil
+                    desc_items = " | ".join([f'{int(i["cantidad"])}x {str(i["display"])}' for i in carrito])
+                    desc = f"Venta carrito: {desc_items} | Pago: {metodo_pago}"
                     if nota:
                         desc += f" | Nota: {nota}"
 
-                    # 1) RPC (ideal)
-                    try:
-                        supabase.rpc(
-                            "registrar_venta",
-                            {
-                                "p_producto_id": id_prod,
-                                "p_cantidad": int(cantidad),
-                                "p_monto": float(total_cobrado),
-                                "p_descripcion": desc,
-                                "p_metodo_pago": metodo,
-                            },
-                        ).execute()
+                    supabase.rpc(
+                        "registrar_venta_carrito",
+                        {
+                            "p_items": items_rpc,
+                            "p_monto_total": float(total_final),
+                            "p_descripcion": desc,
+                            "p_metodo_pago": metodo_pago,
+                        },
+                    ).execute()
 
-                        st.toast("💰 Venta registrada!", icon="✅")
-                        limpiar_cache()
-                        st.rerun()
+                    st.toast("💰 Venta de carrito registrada!", icon="✅")
+                    st.session_state["carrito"] = []
+                    limpiar_cache()
+                    st.rerun()
 
-                    except Exception:
-                        # 2) fallback (sin RPC)
-                        try:
-                            check = (
-                                supabase.table("inventario")
-                                .select("stock")
-                                .eq("id", id_prod)
-                                .single()
-                                .execute()
-                            )
-                            stock_real = int(check.data.get("stock", 0))
+                except Exception as e:
+                    st.error(f"❌ Error al procesar la venta: {e}")
 
-                            if stock_real < int(cantidad):
-                                st.error(
-                                    f"❌ No se pudo registrar la venta: Stock insuficiente (real: {stock_real})."
-                                )
-                            else:
-                                supabase.table("inventario").update(
-                                    {"stock": stock_real - int(cantidad)}
-                                ).eq("id", id_prod).execute()
-
-                                supabase.table("finanzas").insert(
-                                    {
-                                        "fecha": now_ar_str(),
-                                        "tipo": "Ingreso",
-                                        "descripcion": desc,
-                                        "monto": float(total_cobrado),
-                                        "producto_id": id_prod,
-                                        "cantidad": int(cantidad),
-                                        "metodo_pago": metodo,
-                                    }
-                                ).execute()
-
-                                st.toast("💰 Venta registrada (fallback).", icon="✅")
-                                limpiar_cache()
-                                st.rerun()
-                        except Exception as e2:
-                            st.error(f"Error: {e2}")
 
 with tab3:
     st.header("💸 Registrar Gasto")
