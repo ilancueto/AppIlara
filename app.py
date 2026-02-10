@@ -1033,6 +1033,28 @@ with tab4:
     else:
         st.info("No hay movimientos para mostrar.")
 
+st.subheader("➕ Ingreso manual")
+
+with st.form("form_ingreso_manual", clear_on_submit=True):
+    monto = st.number_input("Monto ($)", min_value=0.0, step=100.0)
+    desc = st.text_input("Descripción", placeholder="Regalo, aporte personal, etc.")
+
+    ok = st.form_submit_button("Agregar ingreso")
+
+if ok:
+    if monto <= 0:
+        st.error("El monto debe ser mayor a 0")
+    else:
+        supabase.table("finanzas").insert({
+            "tipo": "Ingreso",
+            "monto": float(monto),
+            "descripcion": desc or "Ingreso manual",
+            "fecha": now_ar_str()
+        }).execute()
+
+        st.toast("💰 Ingreso agregado correctamente", icon="🎁")
+        st.rerun()
+
 # =========================================================
 
 # =========================================================
@@ -1156,3 +1178,4 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
