@@ -1,9 +1,3 @@
-# Ilara Beauty v3.6.0
-# Cambios:
-# - Form agregar: clear_on_submit + toast
-# - Editar producto: permite editar stock
-# - Ventas: stock disponible = stock - en_carrito
-
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
