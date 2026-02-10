@@ -274,6 +274,18 @@ except Exception:
 # =========================================================
 # HELPERS
 # =========================================================
+def queue_toast(msg: str, icon: str = "✅"):
+    """Queue a toast to be shown after st.rerun()."""
+    st.session_state["_toast"] = {"msg": msg, "icon": icon}
+
+# Show queued toast (survives rerun)
+if "_toast" in st.session_state:
+    t = st.session_state.pop("_toast")
+    try:
+        st.toast(t.get("msg",""), icon=t.get("icon","✅"))
+    except Exception:
+        pass
+
 def limpiar_cache():
     st.cache_data.clear()
 
@@ -363,7 +375,7 @@ st.markdown(
         pointer-events: none;
     }
     </style>
-    <div class="footer-fixed">by Ilan con amor · v3.5.0</div>
+    <div class="footer-fixed">by Ilan con amor · v3.6.0</div>
     """,
     unsafe_allow_html=True
 )
@@ -553,7 +565,7 @@ with tab1:
 
     # Agregar / reponer
     with sub_add:
-        with st.form("form_add"):
+        with st.form("form_add", clear_on_submit=True):
             st.caption("Si Nombre+Marca ya existe, suma stock.")
             a, b = st.columns(2)
             nom = a.text_input("Nombre").strip()
@@ -584,7 +596,7 @@ with tab1:
                                 "categoria": cat,
                                 "categoria_id": int(cat_name_to_id.get(cat, 0)) if cat_name_to_id.get(cat) else None
                             }).eq("id", int(prod["id"])).execute()
-                            st.toast(f"🔄 Stock actualizado: {prod['stock']} ➝ {new_stock}", icon="✅")
+                            queue_toast(f"🔄 Stock actualizado: {prod['stock']} ➝ {new_stock}", "✅")
                         else:
                             supabase.table("inventario").insert({
                                 "producto": nom,
@@ -595,7 +607,7 @@ with tab1:
                                 "precio_costo": float(costo),
                                 "precio_venta": float(venta)
                             }).execute()
-                            st.toast(f"✨ Nuevo producto: {nom}", icon="✅")
+                            queue_toast(f"✨ Producto cargado correctamente: {nom}", "💄")
 
                         limpiar_cache()
                         st.rerun()
@@ -619,6 +631,9 @@ with tab1:
                 idx = cats.index(row["categoria"]) if row["categoria"] in cats else 0
                 new_cat = a.selectbox("Categoría", cats, index=idx)
 
+                stock_actual = int(row.get("stock") or 0)
+                new_stock = b.number_input("Stock", min_value=0, value=stock_actual, step=1)
+
                 new_costo = a.number_input("Costo ($)", min_value=0.0, value=float(row["precio_costo"]))
                 new_venta = b.number_input("Venta ($)", min_value=0.0, value=float(row["precio_venta"]))
 
@@ -637,9 +652,10 @@ with tab1:
                                 "categoria_id": int(cat_name_to_id.get(new_cat, 0)) if cat_name_to_id.get(new_cat) else None,
                                 "precio_costo": float(new_costo),
                                 "precio_venta": float(new_venta)
+                                ,"stock": int(new_stock)
                             }).eq("id", id_actual).execute()
 
-                            st.toast("💾 Producto editado.", icon="✅")
+                            queue_toast("💾 Cambios guardados.", "✏️")
                             limpiar_cache()
                             st.rerun()
                     except Exception as e:
@@ -710,7 +726,7 @@ with tab1:
 with tab2:
     st.header("💰 Registrar Venta (Carrito)")
 
-    # ===== CARRITO DE VENTAS (v3.5.0) =====
+    # ===== CARRITO DE VENTAS (v3.6.0) =====
     if "carrito" not in st.session_state:
         st.session_state["carrito"] = []
 
