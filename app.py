@@ -421,21 +421,6 @@ if not df_inv.empty and "stock" in df_inv.columns:
 
 st.markdown(
     f"""
-    <div style="
-      display:flex;
-      align-items:center;
-      gap:16px;
-      background: linear-gradient(90deg,#ff66b2,#ff99cc);
-      padding:16px 20px;
-      border-radius:18px;
-      box-shadow: 0 12px 30px rgba(0,0,0,.14);
-      margin-bottom: 12px;">
-      <img src="assets/logo_icon.png" style="
-        height:64px;
-        border-radius:50%;
-        background:white;
-        padding:6px;
-      "/>
         <div style="flex:1;">
         <div style="font-weight:700;font-size:22px;color:white;">
           Ilara Beauty
@@ -1206,6 +1191,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
