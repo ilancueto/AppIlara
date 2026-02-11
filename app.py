@@ -439,10 +439,10 @@ st.markdown(
       "/>
 
       <div style="flex:1;">
-        <div style="font-weight:700;font-size:22px;color:white;">
-          Ilara Beauty
+        <div style="font-weight:700;font-size:28px;color:white;">
+          Ilara Beauty 💄
         </div>
-        <div style="font-size:14px;opacity:.9;color:white;">
+        <div style="font-size:22px;opacity:.9;color:white;">
           Stock, Ventas y Finanzas
         </div>
       </div>
@@ -1209,6 +1209,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
