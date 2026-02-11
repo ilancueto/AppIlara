@@ -9,7 +9,7 @@ import pytz
 # =========================================================
 st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.logo(
-    "https://github.com/ilancueto/AppIlara/blob/main/assets/logo_ilara.png",
+    "https://github.com/ilancueto/AppIlara/blob/main/assets/logo_icon.png",
     size="small"
 )
 st.markdown(
@@ -1206,6 +1206,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
