@@ -23,7 +23,7 @@ st.markdown("""
     box-shadow: 0 12px 30px rgba(0,0,0,.15);
     margin-bottom: 16px;
 ">
-    <img src="https://github.com/ilancueto/AppIlara/blob/main/assets/logo_ilara.png"
+    <img src="https://raw.githubusercontent.com/ilancueto/AppIlara/main/assets/logo_ilara.png"
          style="
             height:64px;
             width:auto;
@@ -41,7 +41,8 @@ st.markdown("""
         </div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True
+)
 st.markdown(
     """
     <style>
@@ -1221,6 +1222,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
