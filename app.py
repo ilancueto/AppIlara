@@ -431,8 +431,8 @@ st.markdown(
       box-shadow: 0 12px 30px rgba(0,0,0,.14);
       margin-bottom: 12px;">
 
-      <img src="https://raw.githubusercontent.com/ilancueto/AppIlara/main/assets/logo_icon.png" style="
-        height:64px;
+      <img src="https://raw.githubusercontent.com/ilancueto/AppIlara/main/assets/logo_ilara.png" style="
+        height:128px;
         border-radius:50%;
         background:white;
         padding:6px;
@@ -1209,6 +1209,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
