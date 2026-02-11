@@ -7,7 +7,10 @@ import pytz
 # =========================================================
 # CONFIG
 # =========================================================
-st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
+st.set_page_config(
+    page_title="Ilara Beauty",
+    page_icon="assets/logo_icon.png"
+)
 st.logo(
     "assets/logo_icon.png",
     size="small"
@@ -1206,6 +1209,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
