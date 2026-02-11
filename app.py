@@ -421,18 +421,18 @@ if not df_inv.empty and "stock" in df_inv.columns:
 
 st.markdown(
     f"""
-        <div style="flex:1;">
-        <div style="font-weight:700;font-size:22px;color:white;">
-          Ilara Beauty
-        </div>
-        <div style="font-size:14px;opacity:.9;color:white;">
-          Stock, Ventas y Finanzas
-        </div>
-      </div>
-      <div style="font-weight:600;font-size:14px;color:white;">
-        ⚠️ Stock bajo: {stock_crit}
-      </div>
-
+    <div style="
+      background: linear-gradient(90deg,#ff66b2,#ff99cc);
+      color:white;
+      padding:14px 18px;
+      border-radius:18px;
+      font-weight:700;
+      font-size:22px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.14);
+      margin-bottom: 12px;">
+    💄 Ilara Beauty
+    <span style="font-weight:400;font-size:14px;opacity:.92;">— Stock, Ventas y Finanzas</span>
+    <span style="float:right;font-weight:600;font-size:14px;opacity:.95;">⚠️ Stock bajo: {stock_crit}</span>
     </div>
     """,
     unsafe_allow_html=True
@@ -1191,6 +1191,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
