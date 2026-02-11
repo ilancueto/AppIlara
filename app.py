@@ -12,37 +12,6 @@ st.set_page_config(
     page_icon="💄",
     layout="wide"
 )
-st.markdown("""
-<div style="
-    background: linear-gradient(90deg,#ff66b2,#ff99cc);
-    padding: 16px 22px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    box-shadow: 0 12px 30px rgba(0,0,0,.15);
-    margin-bottom: 16px;
-">
-    <img src="https://raw.githubusercontent.com/ilancueto/AppIlara/main/assets/logo_ilara.png"
-         style="
-            height:64px;
-            width:auto;
-            border-radius:12px;
-            background:white;
-            padding:6px;
-         "/>
-
-    <div>
-        <div style="font-size:24px;font-weight:700;color:white;">
-            Ilara Beauty
-        </div>
-        <div style="font-size:14px;opacity:.9;color:white;">
-            Stock · Ventas · Finanzas
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True
-)
 st.markdown(
     """
     <style>
@@ -453,17 +422,35 @@ if not df_inv.empty and "stock" in df_inv.columns:
 st.markdown(
     f"""
     <div style="
+      display:flex;
+      align-items:center;
+      gap:16px;
       background: linear-gradient(90deg,#ff66b2,#ff99cc);
-      color:white;
-      padding:14px 18px;
+      padding:16px 20px;
       border-radius:18px;
-      font-weight:700;
-      font-size:22px;
       box-shadow: 0 12px 30px rgba(0,0,0,.14);
       margin-bottom: 12px;">
-    💄 Ilara Beauty
-    <span style="font-weight:400;font-size:14px;opacity:.92;">— Stock, Ventas y Finanzas</span>
-    <span style="float:right;font-weight:600;font-size:14px;opacity:.95;">⚠️ Stock bajo: {stock_crit}</span>
+
+      <img src="https://raw.githubusercontent.com/ilancueto/AppIlara/main/assets/logo_ilara.png" style="
+        height:64px;
+        border-radius:50%;
+        background:white;
+        padding:6px;
+      "/>
+
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:22px;color:white;">
+          Ilara Beauty
+        </div>
+        <div style="font-size:14px;opacity:.9;color:white;">
+          Stock, Ventas y Finanzas
+        </div>
+      </div>
+
+      <div style="font-weight:600;font-size:14px;color:white;">
+        ⚠️ Stock bajo: {stock_crit}
+      </div>
+
     </div>
     """,
     unsafe_allow_html=True
@@ -1222,6 +1209,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
