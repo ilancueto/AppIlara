@@ -9,8 +9,8 @@ import pytz
 # =========================================================
 st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.logo(
-    "assets/logo_ilara.png",
-    size="small"
+    "https://github.com/ilancueto/AppIlara/blob/main/assets/logo_ilara.png",
+    size="large"
 )
 st.markdown(
     """
@@ -430,15 +430,13 @@ st.markdown(
       border-radius:18px;
       box-shadow: 0 12px 30px rgba(0,0,0,.14);
       margin-bottom: 12px;">
-
-      <img src="assets/logo_ilara.png" style="
+      <img src="https://github.com/ilancueto/AppIlara/blob/main/assets/logo_ilara.png" style="
         height:64px;
         border-radius:50%;
         background:white;
         padding:6px;
       "/>
-
-      <div style="flex:1;">
+        <div style="flex:1;">
         <div style="font-weight:700;font-size:22px;color:white;">
           Ilara Beauty
         </div>
@@ -446,7 +444,6 @@ st.markdown(
           Stock, Ventas y Finanzas
         </div>
       </div>
-
       <div style="font-weight:600;font-size:14px;color:white;">
         ⚠️ Stock bajo: {stock_crit}
       </div>
@@ -1209,6 +1206,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
