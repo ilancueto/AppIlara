@@ -12,6 +12,36 @@ st.set_page_config(
     page_icon="💄",
     layout="wide"
 )
+st.markdown("""
+<div style="
+    background: linear-gradient(90deg,#ff66b2,#ff99cc);
+    padding: 16px 22px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.15);
+    margin-bottom: 16px;
+">
+    <img src="assets/logo_ilara.png"
+         style="
+            height:64px;
+            width:auto;
+            border-radius:12px;
+            background:white;
+            padding:6px;
+         "/>
+
+    <div>
+        <div style="font-size:24px;font-weight:700;color:white;">
+            Ilara Beauty
+        </div>
+        <div style="font-size:14px;opacity:.9;color:white;">
+            Stock · Ventas · Finanzas
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 st.markdown(
     """
     <style>
@@ -1191,6 +1221,7 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
 
