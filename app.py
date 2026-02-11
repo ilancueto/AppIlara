@@ -10,7 +10,7 @@ import pytz
 st.set_page_config(page_title="Ilara Beauty", layout="wide", page_icon="💄")
 st.logo(
     "assets/logo_ilara.png",
-    size="large"
+    size="small"
 )
 st.markdown(
     """
@@ -1209,5 +1209,6 @@ Que cada venta te acerque a lo que soñás, y que nunca te falten motivos para s
 **Te amo.**  
 — Ilan
 """)
+
 
 
